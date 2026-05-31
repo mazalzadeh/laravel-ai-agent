@@ -15,7 +15,7 @@ class OpenAIErrorDTO
         return new self(
             type: $data['error']['type'] ?? 'unknown_error',
             message: $data['error']['message'] ?? 'An unknown error occurred.',
-            status: $status
+            status: $status > 0 ? (string)$status : null
         );
     }
 }

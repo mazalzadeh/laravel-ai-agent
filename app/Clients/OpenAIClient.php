@@ -1,9 +1,11 @@
 <?php
+
 namespace App\Clients;
 
 use App\DTO\ChatResponseDTO;
 use App\DTO\OpenAIErrorDTO;
 use App\Services\AIClientInterface;
+use Generator;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Client\ConnectionException;
@@ -12,108 +14,223 @@ use Illuminate\Http\Client\Response;
 class OpenAIClient implements AIClientInterface
 {
     private string $apiKey;
+    private string $baseUrl;
+    private string $model;
 
     public function __construct()
     {
         $this->apiKey = config('services.openai.key') ?? '';
+        $this->baseUrl = config('services.openai.base_url', 'https://api.openai.com/v1');
+        $this->model = config('services.openai.model', 'gpt-4o');
     }
 
-    public function chat(array $messages, array $options = []): array
+
+
+    public function chat(array $message, array $options = []): array
     {
-        try {
-            $model = $options['model'] ?? 'gpt-4o';
+        $payload = array_merge([
+            'model' => $this->model,
+            'message' => $message,
+        ], $this->filterOptions($options));
 
-            $allowedOptions=[
-                'temperature',
-                'max_tokens',
-                'top_p',
-                'presence_penalty',
-                'frequency_penalty',
-                'response_format',
-            ];
+        $maxAttemps = 3;
+        $attempt = 0;
 
-            $filteredOptions = array_intersect_key($options, array_flip($allowedOptions));
+        while (true) {
+            $attempt++;
 
-            $payload = array_merge(['model' => $model, 'messages' => $messages], $filteredOptions);
+            try {
+                $response = Http::withToken($this->apiKey)
+                    ->post($this->baseUrl . '/chat/completions', $payload);
 
-            $response = Http::withToken($this->apiKey)
-                ->retry(3, 200, function ($exception, $request) {
-                    return $this->shouldRetry($exception);
-                }, throw: false)
-                ->post(
-                    'https://api.openai.com/v1/chat/completions',
-                    $payload
-                );
+                if ($response->successful()) {
+                    return [
+                        'success' => true,
+                        'data' => ChatResponseDTO::fromArray($response->json()),
+                    ];
+                }
 
-            if ($response->successful() && $this->extractErrorType($response) === null) {
+                if ($attempt < $maxAttemps && in_array($response->status(), [429, 500, 502, 503, 504], true)) {
+                    usleep(200_000);
+                    continue;
+                }
+
                 return [
-                    'success' => true,
-                    'data' => ChatResponseDTO::fromArray($response->json())
+                    'success' => false,
+                    'error' => $this->handleError($response),
                 ];
-            } else {
-                return ['success' => false, 'error' => $this->handleError($response)];
+            } catch (ConnectionException $e) {
+                if ($attempt < $maxAttemps) {
+                    usleep(200_000);
+                    continue;
+                }
+
+                return [
+                    'success' => false,
+                    'error' => new OpenAIErrorDTO(
+                        type: 'connection_error',
+                        message: 'Connection to OpenAI failed.',
+                        status: null
+                    ),
+                ];
+            } catch (\Throwable $e) {
+                return [
+                    'success' => false,
+                    'error' => new OpenAIErrorDTO(
+                        type: 'unexpected_error',
+                        message: $e->getMessage(),
+                        status: null
+                    ),
+                ];
             }
-        } catch (ConnectionException $e) {
-            Log::error('OpenAI Connection Error: ' . $e->getMessage());
-            return ['success' => false, 'error' => new OpenAIErrorDTO('connection_error', $e->getMessage(), '0')];
         }
     }
+
+
+    public function streamChat(array $messages, array $options = []): Generator
+    {
+        $payload = array_merge([
+            'model' => $this->model,
+            'messages' => $messages,
+            'stream' => true,
+        ], $this->filterOptions($options));
+
+        try {
+            $response = Http::withToken($this->apiKey)
+                ->withOptions(['stream' => true])
+                ->post($this->baseUrl . '/chat/completions', $payload);
+
+            if (!$response->successful()) {
+                $error = $this->handleError($response);
+
+                Log::error('OpenAI streaming request failed', [
+                    'message' => $error->message,
+                    'type' => $error->type,
+                    'status' => $error->status,
+                ]);
+
+                throw new \RuntimeException($error->message, $error->code ?? 0);
+            }
+
+            $stream = $response->toPsrResponse()->getBody();
+
+            while (!$stream->eof()) {
+                $line = $this->readLine($stream);
+
+                if ($line === '') {
+                    continue;
+                }
+
+                if (!str_starts_with($line, 'data: ')) {
+                    continue;
+                }
+
+                $data = substr($line, 6);
+
+                if ($data === '[DONE]') {
+                    break;
+                }
+
+                $decoded = json_decode($data, true);
+
+                if (!is_array($decoded)) {
+                    continue;
+                }
+
+                $content = $decoded['choices'][0]['delta']['content'] ?? null;
+
+                if ($content !== null && $content !== '') {
+                    yield $content;
+                }
+            }
+        } catch (ConnectionException $e) {
+            Log::error('OpenAI streaming connection failed', [
+                'message' => $e->getMessage(),
+            ]);
+            throw new \RuntimeException('Connection to OpenAI failed during streaming.', 0, $e);
+        } catch (\Throwable $e) {
+            Log::error('Unexpected OpenAI streaming error', [
+                'message' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException(
+                'Unexpected error while streaming from OpenAI.',
+                0,
+                $e
+            );
+        }
+    }
+
+
 
     private function extractErrorType(Response $response): ?string
     {
-        if (!$response->successful()) {
-            return $response->json()['error']['type'] ?? $response->json()['error']['message'] ?? 'api_error';
-        }
+        $json = $response->json();
 
-        $body = $response->json();
-        if (isset($body['error']['type'])) {
-            return $body['error']['type'];
-        }
-        if (isset($body['error']['message'])) {
-            return 'api_error';
-        }
-        return null;
+        return $json['error']['type'] ?? null;
     }
 
-    private function shouldRetry($exception): bool
+    private function readLine($stream): string
+    {
+        $buffer = '';
+
+        while (!$stream->eof()) {
+            $char = $stream->read(1);
+
+            if ($char === "\n") {
+                break;
+            }
+
+            $buffer .= $char;
+        }
+
+        return trim($buffer);
+    }
+
+
+
+    private function shouldRetry(mixed $exception): bool
     {
         //Retry on network errors
         if ($exception instanceof ConnectionException) {
             return true;
         }
 
-        //Retry on specific Http status codes
-        if ($exception instanceof \Illuminate\Http\Client\RequestException) {
+        if (method_exists($exception, 'response') && $exception->response) {
             $status = $exception->response->status();
-            return in_array($status, [429, 500, 502, 503, 504]);
-        }
 
+            return in_array($status, [429, 500, 502, 503, 504], true);
+        }
         return false;
     }
 
+
     private function handleError(Response $response): OpenAIErrorDTO
     {
-        $status = $response->status();
-        $body = $response->json();
+        $json = $response->json();
 
-        $message = $body['error']['message'] ?? ($body['error'] ?? 'Unknown error');
-        if (is_array($message)) {
-            $message = json_encode($message);
-        }
+        $error = $json['error'] ?? [];
 
-        $type = match ($status) {
-            429 => 'rate_limit_exceeded',
-            401 => 'invalid_api_key',
-            400 => 'bad_request',
-            default => 'api_error',
-        };
+        return OpenAIErrorDTO::fromArray(
+            data: $response->json() ?? [],
+            status: $response->status()
+        );
+    }
 
-        if (!$response->successful() && isset($body['error']['type'])) {
-            $type = $body['error']['type'];
-        }
 
-        Log::warning("OpenAI API Error [$status]: $message");
+    private function filterOptions(array $options): array
+    {
+        $allowedOptions = [
+            'temperature',
+            'top_p',
+            'max_tokens',
+            'presence_penalty',
+            'frequency_penalty',
+            'stop',
+            'user',
+            'response_format',
+        ];
 
-        return new OpenAIErrorDTO($type, $message, (string)$status);
+        return array_intersect_key($options, array_flip($allowedOptions));
     }
 }

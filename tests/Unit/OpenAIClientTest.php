@@ -108,7 +108,8 @@ class OpenAIClientTest extends TestCase
     public function test_it_retries_on_500_error_and_eventually_succeeds()
     {
         Http::fake([
-            'api.openai.com/v1/chat/completions' => Http::sequence()
+            // 'api.openai.com/v1/chat/completions' => Http::sequence()
+            'https://api.openai.com/v1/chat/completions' => Http::sequence()
                 ->push(['error' => ['message' => 'Server error']], 500)
                 ->push(['error' => ['message' => 'Server error']], 500)
                 ->push([
@@ -116,8 +117,19 @@ class OpenAIClientTest extends TestCase
                     'object' => 'chat.completion',
                     'created' => time(),
                     'model' => 'gpt-4o',
-                    'choices' => [['message' => ['role' => 'assistant', 'content' => 'Success after retry']]],
-                    'usage' => ['total_tokens' => 10]
+                    'choices' => [[
+                        'index' => 0,
+                        'message' => [
+                            'role' => 'assistant',
+                            'content' => 'Success after retry',
+                        ],
+                        'finish_reason' => 'stop',
+                    ]],
+                    'usage' => [
+                        'prompt_tokens' => 5,
+                        'completion_tokens' => 5,
+                        'total_tokens' => 10,
+                    ]
                 ], 200)
         ]);
 
