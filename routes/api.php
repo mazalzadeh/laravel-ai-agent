@@ -1,0 +1,46 @@
+<?php
+
+use App\Http\Controllers\ChatController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+
+
+Route::post('/fake-openai/chat', function(Request $request){
+
+    $message = $request->input('messages.0.content');
+
+    return response()->json(
+        [
+            'id' => 'chatcmpl-fake',
+            'object' => 'chat.completion',
+            'choices' => [
+                [
+                    'index' => 0,
+                    'message' => [
+                        'role' => 'assistant',
+                        'content' => "You said: " . $message
+                    ],
+                    'finish_reason' => 'stop'
+                ]
+            ]
+        ]
+    );
+});
+
+Route::post('/chat',[ChatController::class, 'chat']);
+
+/*Route::match(['get','post'],'/fake-openai/chat', function(Request $request) {
+
+    $message = $request->input('messages.0.content') ?? 'no message';
+
+    return response()->json([
+        'choices' => [
+            [
+                'message' => [
+                    'role' => 'assistant',
+                    'content' => "You said: ".$message
+                ]
+            ]
+        ]
+    ]);
+});*/
