@@ -4,6 +4,8 @@ namespace App\Services;
 use App\DTO\ChatResponseDTO;
 use App\DTO\OpenAIErrorDTO;
 use App\Services\AIClient;
+use App\Clients\OpenAIClient;
+use Generator;
 
 class AIService
 {
@@ -56,6 +58,11 @@ class AIService
         $responseContent = $this->chat($messages, $options);
 
         return json_decode($responseContent, true) ?? [];
+    }
+
+    public function streamChat(array $messages, array $options = []): Generator
+    {
+        return $this->client->streamChat($messages, $options);
     }
 }
 

@@ -28,19 +28,4 @@ Route::post('/fake-openai/chat', function(Request $request){
 });
 
 Route::post('/chat',[ChatController::class, 'chat']);
-
-/*Route::match(['get','post'],'/fake-openai/chat', function(Request $request) {
-
-    $message = $request->input('messages.0.content') ?? 'no message';
-
-    return response()->json([
-        'choices' => [
-            [
-                'message' => [
-                    'role' => 'assistant',
-                    'content' => "You said: ".$message
-                ]
-            ]
-        ]
-    ]);
-});*/
+Route::post('/chat/stream', [ChatController::class, 'stream']);

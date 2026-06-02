@@ -197,7 +197,7 @@ class OpenAIClientTest extends TestCase
         $messages = [
             ['role' => 'system', 'content' => 'You are a helpful assistant.'],
             ['role' => 'user', 'content' => 'Hi'],
-            ['role' => 'assistan', 'content' => 'Hello! How can I help?'],
+            ['role' => 'assistant', 'content' => 'Hello! How can I help?'],
             ['role' => 'user', 'content' => 'Summarize our conversation.'],
         ];
 

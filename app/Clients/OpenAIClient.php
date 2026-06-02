@@ -30,7 +30,7 @@ class OpenAIClient implements AIClientInterface
     {
         $payload = array_merge([
             'model' => $this->model,
-            'message' => $message,
+            'messages' => $message,
         ], $this->filterOptions($options));
 
         $maxAttemps = 3;

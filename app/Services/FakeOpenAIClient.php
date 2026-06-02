@@ -1,5 +1,6 @@
 <?php
 namespace App\Services;
+use Generator;
 
 class FakeOpenAIClient implements AIClientInterface
 {
@@ -30,5 +31,10 @@ class FakeOpenAIClient implements AIClientInterface
                 ],
             ],
         ];
+    }
+
+    public function streamChat(array $messages, array $options = []): Generator
+    {
+        yield 'Fake response';
     }
 }
