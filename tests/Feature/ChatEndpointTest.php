@@ -44,13 +44,18 @@ class ChatEndpointTest extends TestCase
             {
                 $userMessage = $messages[0]['content'] ?? '';
                 return [
-                    'success' => true, 
+                    'success' => true,
                     'data' => new ChatResponseDTO(
-                            id: 'chatcmpl-test',
-                            content: 'You said: ' . $userMessage,
-                            role: 'assistant'
-                )                   
+                        id: 'chatcmpl-test',
+                        content: 'You said: ' . $userMessage,
+                        role: 'assistant'
+                    )
                 ];
+            }
+
+            public function streamChat(array $messages, array $options = []): \Generator
+            {
+                yield from [];
             }
         };
 

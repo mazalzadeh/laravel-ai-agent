@@ -14,10 +14,10 @@ class AIServiceTest extends TestCase
 {
     public function test_chat_returns_ai_message()
     {
-        $fakeClient = new class implements AIClientInterface{
+        $fakeClient = new class implements AIClientInterface {
             public function chat(array $messages, array $options = []): array
             {
-                return[
+                return [
                     'success' => true,
                     'data' => new ChatResponseDTO(
                         id: 'chatcmpl-test',
@@ -25,6 +25,11 @@ class AIServiceTest extends TestCase
                         role: 'assistant'
                     )
                 ];
+            }
+
+            public function streamChat(array $messages, array $options = []): \Generator
+            {
+                yield from [];
             }
         };
 
@@ -49,6 +54,11 @@ class AIServiceTest extends TestCase
                         role: 'assistant'
                     )
                 ];
+            }
+
+            public function streamChat(array $messages, array $options = []): \Generator
+            {
+                yield from [];
             }
         };
 
@@ -83,6 +93,10 @@ class AIServiceTest extends TestCase
                         ]
                     ])
                 ];
+            }
+            public function streamChat(array $messages, array $options = []): \Generator
+            {
+                yield from [];
             }
         };
 
