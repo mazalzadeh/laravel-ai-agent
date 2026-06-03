@@ -21,15 +21,22 @@ class ChatController extends Controller
         return response()->json(['reply' => $reply]);
     }
 
-    public function stream(): StreamedResponse
+    public function stream(Request $request): StreamedResponse
     {
-        $messages = $request->input('messages');
+        $validated = $request->validate([
+            'messages' => ['required', 'array'],
+            'messages.*.role' => ['required', 'string'],
+            'messages.*.content' => ['required', 'string'],
+        ]);
+
+        $messages = $validated['messages'];
 
         $stream = $this->aiservice->streamChat($messages);
 
         return response()->stream(function () use ($stream) {
             foreach ($stream as $chunk) {
-                echo "data: " . json_encode(['content' => $chunk]) . "\n\n";
+                // echo "data: " . json_encode(['content' => $chunk]) . "\n\n";
+                echo 'data: ' . json_encode(['content' => $chunk], JSON_UNESCAPED_UNICODE) . "\n\n";
 
                 if (ob_get_level() > 0) {
                     ob_flush();
@@ -39,7 +46,7 @@ class ChatController extends Controller
             echo "data: [DONE]\n\n";
 
             if (ob_get_level() > 0) {
-                flush();
+                ob_flush();
             }
         }, 200, [
             'Content-Type' => 'text/event-stream',

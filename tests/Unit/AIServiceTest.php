@@ -7,8 +7,10 @@ use PHPUnit\Framework\TestCase;
 use Tests\Unit;
 use App\Services\AIService;
 use App\Services\AIClientInterface;
+use Generator;
 use GrahamCampbell\ResultType\Success;
 use Illuminate\Support\Facades\Http;
+use Mockery;
 
 class AIServiceTest extends TestCase
 {
@@ -107,5 +109,38 @@ class AIServiceTest extends TestCase
         $this->assertIsArray($result);
         $this->assertSame('Server Maintenance', $result['subject']);
         $this->assertSame('High', $result['priority']);
+    }
+
+    public function test_it_calls_client_stream_chat_and_returns_generator(): void
+    {
+        $messages = [['role' => 'user', 'content' => 'Hello']];
+
+        $options = ['temperature' => 0.7];
+
+        $generatorFactory = function (): Generator {
+            yield 'Hello';
+            yield 'world';
+        };
+
+        $expectedGenerator = $generatorFactory();
+
+        $client = Mockery::mock(AIClientInterface::class);
+        $client->shouldReceive('streamChat')
+            ->once()
+            ->with($messages, $options)
+            ->andReturn($expectedGenerator);
+
+        $service = new AIService($client);
+
+        $result = $service->streamChat($messages, $options);
+
+        $this->assertInstanceOf(Generator::class, $result);
+        $this->assertSame(['Hello', 'world'], iterator_to_array($result));
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
     }
 }
