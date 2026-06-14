@@ -48,4 +48,22 @@ class ChatControllerTest extends TestCase
         Mockery::close();
         parent::tearDown();
     }
+
+    public function test_stream_requires_messages()
+    {
+        $response = $this->postJson('/api/chat/stream', []);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['messages']);
+    }
+
+    public function test_stream_requires_valid_message_structure()
+    {
+        $response = $this->postJson('/api/chat/stream', [
+            'messages' => [['role' => 'user']]
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['messages.0.content']);
+    }
 }

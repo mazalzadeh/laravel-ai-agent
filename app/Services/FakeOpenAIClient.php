@@ -4,7 +4,7 @@ use Generator;
 
 class FakeOpenAIClient implements AIClientInterface
 {
-    public function chat(string $message): array
+    public function chat(array $message, array $options = []): array
     {
         // شبیه‌سازی پاسخ موفق OpenAI
         return [
@@ -35,6 +35,32 @@ class FakeOpenAIClient implements AIClientInterface
 
     public function streamChat(array $messages, array $options = []): Generator
     {
-        yield 'Fake response';
+        $words = ["این", " یک", " پاسخ", " آزمایشی", " به", " صورت", " استریم", " است."];
+
+        foreach ($words as $word) {
+            yield $word;
+            usleep(200000); // ۲۰۰ میلی‌ثانیه صبر برای شبیه‌سازی سرعت شبکه
+        }
+
+        // جملاتی که شامل مارک‌داون هستند برای تست UI
+        /*$chunks = [
+            "سلام! این یک **تست مارک‌داون** است.\n\n",
+            "در اینجا یک نمونه کد PHP برای شما می‌نویسم:\n",
+            "
+            ```php\n",
+            "public function ",
+            "hello() {\n",
+            "    echo ",
+            "'Hello World!';\n",
+            "}\n",
+            "
+            ```\n",
+            "امیدوارم خوشت اومده باشه! 😊"
+        ];
+
+        foreach ($chunks as $chunk) {
+            yield $chunk;
+            usleep(300000); // وقفه ۳۰۰ میلی‌ثانیه‌ای برای دیدن حالت تایپ زنده
+        }*/
     }
 }
