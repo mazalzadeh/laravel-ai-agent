@@ -57,6 +57,11 @@ class ChatEndpointTest extends TestCase
             {
                 yield from [];
             }
+
+            public function embed(string $text): array
+            {
+                return [0.1, 0.2, 0.3];
+            }
         };
 
         $this->app->bind(AIClientInterface::class, fn() => $fakeClient);

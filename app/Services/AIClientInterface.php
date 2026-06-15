@@ -9,7 +9,9 @@ interface AIClientInterface
      * @param array $messages 
      * @param array $options
      */
-    public function chat(array $messages ,array $options = []): array;
+    public function chat(array $messages, array $options = []): array;
 
-    public function streamChat(array $messages, array $options = []):\Generator;
+    public function streamChat(array $messages, array $options = []): \Generator;
+
+    public function embed(string $text): array;
 }

@@ -63,4 +63,18 @@ class FakeOpenAIClient implements AIClientInterface
             usleep(300000); // وقفه ۳۰۰ میلی‌ثانیه‌ای برای دیدن حالت تایپ زنده
         }*/
     }
+
+    public function embed(string $text): array
+    {
+        $hash = md5($text);
+
+        $vector = [];
+
+        for ($i = 0; $i < 16; $i++) {
+            $chunk = substr($hash, $i * 2, 2);
+            $vector[] = hexdec($chunk) / 255;
+        }
+
+        return $vector;
+    }
 }

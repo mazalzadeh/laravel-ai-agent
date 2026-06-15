@@ -64,5 +64,10 @@ class AIService
     {
         return $this->client->streamChat($messages, $options);
     }
+
+    public function embed(string $text): array
+    {
+        return $this->client->embed($text);
+    }
 }
 

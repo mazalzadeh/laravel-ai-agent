@@ -161,6 +161,21 @@ class OpenAIClient implements AIClientInterface
         }
     }
 
+    public function embed(string $text): array
+    {
+        $response = Http::withToken($this->apiKey)
+            ->post('https://api.openai.com/v1/embeddings', [
+                'model' => 'text-embedding-3-small',
+                'input' => $text,
+            ]);
+
+        if ($response->failed()) {
+            throw new \Exception('OpenAI embedding request failed');
+        }
+
+        return $response->json('data.0.embedding');
+    }
+
 
 
     private function extractErrorType(Response $response): ?string
