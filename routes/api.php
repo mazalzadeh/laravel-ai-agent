@@ -3,7 +3,7 @@
 use App\Http\Controllers\ChatController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\SemanticSearchController;
 
 Route::post('/fake-openai/chat', function(Request $request){
 
@@ -29,3 +29,4 @@ Route::post('/fake-openai/chat', function(Request $request){
 
 Route::post('/chat',[ChatController::class, 'chat']);
 Route::post('/chat/stream', [ChatController::class, 'stream']);
+Route::post('/semantic-search', SemanticSearchController::class);
