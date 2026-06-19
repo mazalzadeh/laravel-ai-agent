@@ -19,13 +19,26 @@ class AIServiceTest extends TestCase
         $fakeClient = new class implements AIClientInterface {
             public function chat(array $messages, array $options = []): array
             {
-                return [
+                /*return [
                     'success' => true,
                     'data' => new ChatResponseDTO(
                         id: 'chatcmpl-test',
                         content: 'You said: ' . $messages[0]['content'],
                         role: 'assistant'
                     )
+                ];*/
+                return [
+                    'success' => true,
+                    'data' => [
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => 'You said: ' . $messages[0]['content'],
+                                ]
+                            ]
+                        ]
+                    ]
                 ];
             }
 
@@ -53,13 +66,26 @@ class AIServiceTest extends TestCase
 
             public function chat(array $messages, array $options = []): array
             {
-                return [
+                /*return [
                     'success' => true,
                     'data' => new ChatResponseDTO(
                         id: 'chatcmpl-test',
                         content: '',
                         role: 'assistant'
                     )
+                ];*/
+                return [
+                    'success' => true,
+                    'data' => [
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => '',
+                                ]
+                            ]
+                        ]
+                    ]
                 ];
             }
 
@@ -76,7 +102,9 @@ class AIServiceTest extends TestCase
 
         $service = new AIService($fakeClient);
 
-        $reply = $service->chat(['role' => 'user', 'content' => 'Hello']);
+        // $reply = $service->chat(['role' => 'user', 'content' => 'Hello']);
+
+        $reply = $service->chat([['role' => 'user', 'content' => 'Hello']]);
 
         $this->assertEquals('No response content from AI.', $reply);
     }
@@ -94,7 +122,7 @@ class AIServiceTest extends TestCase
                     'priority' => 'High',
                     'summary' => 'The server will be down for 2 hours.'
                 ]);
-                return [
+                /*return [
                     'success' => true,
                     'data' => ChatResponseDTO::fromArray([
                         'id' => 'chatcmpl_123',
@@ -104,6 +132,19 @@ class AIServiceTest extends TestCase
                             ]
                         ]
                     ])
+                ];*/
+                return [
+                    'success' => true,
+                    'data' => [
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => $jsonResponse
+                                ]
+                            ]
+                        ]
+                    ]
                 ];
             }
             public function streamChat(array $messages, array $options = []): \Generator

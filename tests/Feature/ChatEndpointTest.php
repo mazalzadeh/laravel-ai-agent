@@ -43,13 +43,26 @@ class ChatEndpointTest extends TestCase
             public function chat(array $messages, array $options = []): array
             {
                 $userMessage = $messages[0]['content'] ?? '';
-                return [
+                /*return [
                     'success' => true,
                     'data' => new ChatResponseDTO(
                         id: 'chatcmpl-test',
                         content: 'You said: ' . $userMessage,
                         role: 'assistant'
                     )
+                ];*/
+                return [
+                    'success' => true,
+                    'data' => [
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => 'You said: ' . $userMessage,
+                                ]
+                            ]
+                        ]
+                    ]
                 ];
             }
 

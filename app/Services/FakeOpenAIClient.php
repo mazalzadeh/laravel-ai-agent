@@ -19,7 +19,8 @@ class FakeOpenAIClient implements AIClientInterface
                         'index'   => 0,
                         'message' => [
                             'role'    => 'assistant',
-                            'content' => "You said: \"{$message}\"",
+                            //'content' => "You said: \"{$message}\"",
+                            'content' => 'You said: "' . json_encode($message) . '"',
                         ],
                         'finish_reason' => 'stop',
                     ],

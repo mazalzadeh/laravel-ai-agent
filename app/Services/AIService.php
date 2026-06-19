@@ -19,12 +19,25 @@ class AIService
     public function chat(array $messages, array $options = []) : string
     {
         $response = $this->client->chat($messages, $options);
-        
-        //success
-        if(($response['success'] ?? false) === true) {
-            $dto = $response['data'];
-            return $dto->content ?: 'No response content from AI.';
 
+        //success
+        /*if (($response['success'] ?? false) === true) {
+            $dto = $response['data'];
+            //return $dto->content ?: 'No response content from AI.';
+            $content = $dto['choices'][0]['message']['content'] ?? 'No response content from AI.';
+            return $content ?: 'No response content from AI.';
+        }*/
+
+        if (($response['success'] ?? false) == true) {
+            $data = $response['data'];
+
+            if ($data instanceof ChatResponseDTO) {
+                return $data->content ?: 'No response content from AI.';
+            }
+
+            $content = $data['choices'][0]['message']['content'] ?? null;
+
+            return $content ?: 'No response content from AI.';
         }
 
         //error
