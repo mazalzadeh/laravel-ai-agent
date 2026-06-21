@@ -2,22 +2,30 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Http\Requests\RagChatRequest;
 use App\Services\AIService;
 use App\Services\VectorSimilarityService;
+use App\Services\RagService;
 
 class RagChatController extends Controller
 {
     public function __construct(
-        private AIService $ai,
-        private VectorSimilarityService $simililarity
+        protected RagService $ragService
     ) {}
 
     /**
      * Handle the incoming request.
      */
     public function __invoke(RagChatRequest $request)
+    {
+        $result = $this->ragService->answer($request->input('question'));
+
+        return response()->json($result);
+    }
+
+
+
+    /*public function __invoke(RagChatRequest $request)
     {
         $question = $request->question;
         $limit = $request->limit ?? 5;
@@ -49,5 +57,5 @@ class RagChatController extends Controller
                 'score' => $r['score'],
             ]),
         ]);
-    }
+    }*/
 }

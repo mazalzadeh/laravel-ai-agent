@@ -40,5 +40,6 @@ class RagChatTest extends TestCase
         ]);
 
         $response->assertStatus(200)->assertJsonStructure(['question', 'answer', 'sources' => [['content', 'score']]]);
+        $response->assertJsonFragment(['question' => 'What is Laravel?']);
     }
 }

@@ -18,8 +18,8 @@ class VectorSimilarityService
 
         foreach ($a as $i => $value) {
             $dotProduct += $value * $b[$i];
-            $normA = $value * $value;
-            $normB = $b[$i] * $b[$i];
+            $normA += $value * $value;
+            $normB += $b[$i] * $b[$i];
         }
 
         if ($normA == 0 || $normB == 0) {
