@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Document;
+use App\Models\DocumentChunk;
 
 class VectorSimilarityService
 {
@@ -29,7 +30,7 @@ class VectorSimilarityService
         return $dotProduct / (sqrt($normA) * sqrt($normB));
     }
 
-    public function findMostSimilar(array $queryEmbedding, int $limit=5)
+    /*public function findMostSimilar(array $queryEmbedding, int $limit=5)
     {
         $documents= Document::all();
 
@@ -43,5 +44,18 @@ class VectorSimilarityService
         });
 
         return $scored->sortByDesc('score')->take($limit)->values();
+    }*/
+
+    public function findMostSimilar(array $queryEmbedding, int $limit = 5)
+    {
+        return DocumentChunk::with('document')
+            ->get()
+            ->map(function ($chunk) use ($queryEmbedding) {
+                return [
+                    'document' => $chunk->document,
+                    'chunk' => $chunk,
+                    'score' => $this->cosineSimilarity($queryEmbedding, $chunk->embedding),
+                ];
+            })->sortByDesc('score')->take($limit)->values();
     }
 }

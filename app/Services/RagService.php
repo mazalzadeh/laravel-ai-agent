@@ -48,14 +48,22 @@ class RagService
         $answer = $this->aiservice->chat($messages);
 
         //6- preaper sources
-        $sources = collect($similarDocuments)
+        /*$sources = collect($similarDocuments)
             ->map(function ($item) {
                 return [
                     'id' => $item['document']->id,
                     'content' => $item['document']->content,
                     'score' => $item['score'],
                 ];
-            })->values();
+            })->values();*/
+        //6- preaper sources
+        $sources = collect($similarDocuments)
+            ->map(fn($item) => [
+                'document_id' => $item['document']->id,
+                'chunk_id' => $item['chunk']->id ?? null,
+                'content' => $item['chunk']->content ?? $item['document']->content,
+                'score' => $item['score'],
+            ])->values();
 
         return [
             'question' => $question,
