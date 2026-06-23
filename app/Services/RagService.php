@@ -10,13 +10,18 @@ class RagService
     public function __construct(
         protected AIService $aiservice,
         protected VectorSimilarityService $vectorService,
-        protected RagContextBuilder $contextBuilder
+        protected RagContextBuilder $contextBuilder,
+        protected EmbeddingCacheService $embeddingCache
     ) {}
 
     public function answer(string $question, int $limit = 5): array
     {
         //1- generate embedding for question
-        $queryEmbedding = $this->aiservice->embed($question);
+        /*$queryEmbedding = $this->aiservice->embed($question);*/
+        $queryEmbedding = $this->embeddingCache->remember(
+            $question,
+            fn() => $this->aiservice->embed($question)
+        );
 
         //2- retrieve similar documents
         $similarDocuments = $this->vectorService->findMostSimilar($queryEmbedding, $limit);
