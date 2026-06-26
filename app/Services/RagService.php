@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\DocumentChunk;
 use App\Services\AIService;
 use App\Services\VectorSimilarityService;
+use Ramsey\Collection\Collection;
 
 class RagService
 {
@@ -75,5 +77,59 @@ class RagService
             'answer' => $answer,
             'sources' => $sources,
         ];
+    }
+
+    public function ask(string $question): array
+    {
+        $documents = $this->retrieve($question);
+        $contextString = $this->contextBuilder->build($documents);
+
+        $schema = [
+            "type" => "object",
+            "properties" => [
+                "answer" => ["type" => "string"],
+                "source_ids" => ["type" => "array", "items" => ["type" => "integer"]],
+                "confidence" => ["type" => "number"]
+            ],
+            "required" => ["answer", "source_ids"]
+        ];
+
+        $prompt = "Context:\n{$contextString}\n\nQuestion:\n{$question}";
+
+        return $this->aiservice->structured($prompt, $schema);
+    }
+
+    private function retrieve(string $question): Collection
+    {
+        $maxDocuments = config('rag.max_documents', 5);
+
+        $keywords = collect(preg_split('/\s+/', trim($question)))
+            ->filter(fn($word) => mb_strlen($word) >= 3)
+            ->map(fn($word) => mb_strtolower($word))
+            ->unique()
+            ->values();
+
+        $chunks = DocumentChunk::query()
+            ->with('document')
+            ->get()
+            ->map(function (DocumentChunk $chunk) use ($keywords) {
+                $haystack = mb_strtolower(
+                    ($chunk->content ?? '') . ' ' . ($chunk->document->title ?? '')
+                );
+
+                $score = $keywords->reduce(function (float $carry, string $keyword) use ($haystack) {
+                    return str_contains($haystack, $keyword) ? $carry + 1 : $carry;
+                }, 0);
+
+                return [
+                    'document' => $chunk->document,
+                    'chunk' => $chunk,
+                    'score' => $score,
+                ];
+            })
+            ->filter(fn(array $item) => $item['score'] > 0)
+            ->sortByDesc('score')
+            ->take($maxDocuments)
+            ->values();
     }
 }
