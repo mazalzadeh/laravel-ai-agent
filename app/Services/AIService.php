@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\AI\StructuredResponseValidator;
 use App\DTO\ChatResponseDTO;
 use App\DTO\OpenAIErrorDTO;
 use App\Services\AIClient;
@@ -93,21 +94,15 @@ class AIService
             ['role' => 'user', 'content' => $prompt],
         ]);
 
-        $data= json_decode($response, true);
+        $data = json_decode($response, true);
 
         //1. check JSON structure
-        if(json_last_error()!==JSON_ERROR_NONE||!is_array($data)){
-            throw new \RuntimeException("AI failed to retrun a valid Json string.")
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+            throw new \RuntimeException("AI failed to retrun a valid Json string.");
         }
 
-        //2. check required fields based on schema
-        if (isset($schema['required'])){
-            foreach($schema['required'] as $filed){
-                if(!isset($data[$filed])){
-                    throw new \RuntimeException("AI response is missing required field:{$field}");
-                }
-            }
-        }
+        //2. validate fields and types based on Schema
+        StructuredResponseValidator::validate($data, $schema);
         return $data;
     }
 }

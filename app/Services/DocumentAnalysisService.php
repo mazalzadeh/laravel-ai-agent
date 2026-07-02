@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\AI\Schema\ClassificationSchema;
 use App\Services\AIService;
 use App\AI\Schema\SummarySchema;
 
@@ -21,15 +22,10 @@ class DocumentAnalysisService
 
     public function classify(string $text): array
     {
-        $schema = [
-            "type" => "object",
-            "properties" => [
-                "category" => ["type" => "string", "enum" => ["support", "billing", "technical", "other"]],
-                "prioritye" => ["type" => "string", "enum" => ["low", "medium", "high"]]
-            ],
-            "required" => ["category", "priority"]
-        ];
-        return $this->ai->structured("Classify this support ticket:" . $text, $schema);
+        return $this->ai->structured(
+            "Classify this support ticket:" . $text,
+            ClassificationSchema::toArray()
+        );
     }
 
     public function extractEntities(string $text): array

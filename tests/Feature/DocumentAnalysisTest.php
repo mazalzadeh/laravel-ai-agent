@@ -29,7 +29,7 @@ class DocumentAnalysisTest extends TestCase
 
         $result = $service->summarize("Some sample text to summarize");
 
-        $this->assertEquals("Laravel is a powerful PHP framework.", $result['summary']);
-        $this->assertContains("Laravel", $result['topics']);
+        $this->assertEquals("This is a test summary", $result['summary']);
+        $this->assertContains("laravel", $result['keywords']);
     }
 }
