@@ -3,6 +3,7 @@
 namespace App\AI;
 
 use RuntimeException;
+use Whoops\Run;
 
 class StructuredResponseValidator
 {
@@ -37,25 +38,31 @@ class StructuredResponseValidator
             }
 
             $propertySchema = $properties[$key];
-            $expectedType = $propertySchema['type'] ?? null;
+            $expectedTypes = self::getExpectedTypes($propertySchema);
             $fieldPath = self::buildPath($path, $key);
 
-            if (
-                $expectedType !== null
-                && !self::matchesType($value, $expectedType)
-            ) {
-                $actualType = self::getActualType($value);
+            if ($value === null) {
+                if (self::isNullable($propertySchema)) {
+                    continue;
+                }
 
-                throw new \RuntimeException(
+                throw new RuntimeException("Field '{$fieldPath}' cannot be null.");
+            }
+
+            if ($expectedTypes !== [] && !self::matchesAnyType($value, $expectedTypes)) {
+                $actualType = self::getActualType($value);
+                $expectedTypesText = implode('|', $expectedTypes);
+
+                throw new RuntimeException(
                     "Field '{$fieldPath}' must be of type " .
-                        "'{$expectedType}', '{$actualType}' given."
+                        "'{$expectedTypesText}', '{$actualType}' given."
                 );
             }
 
             self::validateEnum($value, $propertySchema, $fieldPath);
 
             //Recursively validate nested objects
-            if ($expectedType === 'object') {
+            if (in_array('object', $expectedTypes, true)) {
                 self::validateSchema(
                     $value,
                     $propertySchema,
@@ -63,7 +70,7 @@ class StructuredResponseValidator
                 );
             }
 
-            if ($expectedType === 'array') {
+            if (in_array('array', $expectedTypes, true)) {
                 self::validateArrayItems(
                     $value,
                     $propertySchema,
@@ -73,21 +80,40 @@ class StructuredResponseValidator
         }
     }
 
+
     private static function validateEnum(
         mixed $value,
         array $schema,
         string $path
     ): void {
-        if (!array_key_exists('enum', $schema)) {
+
+        if ($value === null && self::isNullable($schema)) {
+            return;
+        }
+
+        if (
+            !array_key_exists('enum', $schema)
+            || !is_array($schema['enum'])
+        ) {
             return;
         }
 
         if (!in_array($value, $schema['enum'], true)) {
-            $allowedValues = implode(', ', array_map(static fn($item) => var_export($item, true), $schema['enum']));
+            $allowedValues = implode(
+                ', ',
+                array_map(
+                    static fn($item) => var_export($item, true),
+                    $schema['enum']
+                )
+            );
+
 
             $actualValue = var_export($value, true);
 
-            throw new RuntimeException("Field '{$path}' must be one of [{$allowedValues}], '{$actualValue}' given.");
+            throw new RuntimeException(
+                "Field '{$path}' must be one of " .
+                    "[{$allowedValues}], '{$actualValue}' given."
+            );
         }
     }
 
@@ -105,23 +131,48 @@ class StructuredResponseValidator
 
         foreach ($items as $index => $item) {
             $itemPath = "{$path}.{$index}";
-            $expectedItemType = $itemSchema['type'] ?? null;
+            $expectedItemTypes = self::getExpectedTypes($itemSchema);
 
-            if ($expectedItemType !== null && !self::matchesType($item, $expectedItemType)) {
-                $actualType = self::getActualType($item);
+            /*
+            * Handle nullable array items before normal type validation.
+            */
+            if ($item === null) {
+                if (self::isNullable($itemSchema)) {
+                    continue;
+                }
 
                 throw new RuntimeException(
-                    "Field '{$itemPath}' must be of type '{$expectedItemType}', '{$actualType}' given."
+                        "Field '{$itemPath}' cannot be null."
                 );
             }
 
+            /*
+            * Validate non-null item types.
+            */
+            if ($expectedItemTypes !== [] && !self::matchesAnyType($item, $expectedItemTypes)) {
+                $actualType = self::getActualType($item);
+                $expectedItemTypesText = implode('|', $expectedItemTypes);
+
+                throw new RuntimeException(
+                    "Field '{$itemPath}' must be of type " .
+                        "'{$expectedItemTypesText}', '{$actualType}' given."
+                );
+            }
+
+
             self::validateEnum($item, $itemSchema, $itemPath);
 
-            if ($expectedItemType === 'object') {
+            /*
+            * Recursively validate object items.
+            */
+            if (in_array('object', $expectedItemTypes, true)) {
                 self::validateSchema($item, $itemSchema, $itemPath);
             }
 
-            if ($expectedItemType === 'array') {
+            /*
+            * Recursively validate nested array items.
+            */
+            if (in_array('array', $expectedItemTypes, true)) {
                 self::validateArrayItems($item, $itemSchema, $itemPath);
             }
         }
@@ -150,6 +201,18 @@ class StructuredResponseValidator
         };
     }
 
+    //Compares the value against all allowed types. If it matches at least one of them, it returns true.
+    private static function matchesAnyType(mixed $value, array $expectedTypes): bool
+    {
+        foreach ($expectedTypes as $expectedType) {
+            if (self::matchesType($value, $expectedType)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 
     private static function getActualType(mixed $value): string
     {
@@ -170,5 +233,37 @@ class StructuredResponseValidator
         }
 
         return "{$parentPath}.{$field}";
+    }
+
+
+    private static function isNullable(array $schema): bool
+    {
+        if (($schema['nullable'] ?? false) === true) {
+            return true;
+        }
+
+        $type = $schema['type'] ?? null;
+
+        if (is_array($type) && in_array('null', $type, true)) {
+            return true;
+        }
+
+        return false;
+    }
+
+
+    private function getExpectedTypes(array $schema): array
+    {
+        $type = $schema['type'] ?? null;
+
+        if ($type === null) {
+            return [];
+        }
+
+        if (is_array($type)) {
+            return array_values(array_filter($type, static fn(mixed $item): bool => is_string($item) && $item !== 'null'));
+        }
+
+        return is_string($type) ? [$type] : [];
     }
 }
