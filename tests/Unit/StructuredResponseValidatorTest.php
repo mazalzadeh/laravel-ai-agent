@@ -270,4 +270,101 @@ class StructuredResponseValidatorTest extends TestCase
 
         StructuredResponseValidator::validate($data, $schema);
     }
+
+    public function test_it_rejects_invalid_type_for_nullable_array_items(): void
+    {
+        $schema = [
+            'properties' => [
+                'nullable_array' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'string',
+                        'nullable' => true,
+                    ],
+                ]
+            ],
+        ];
+
+        $data = ['nullable_array' => [null, 'ok', 123]];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("Field 'nullable_array.2' must be of type 'string', 'integer' given.");
+
+        StructuredResponseValidator::validate($data, $schema);
+    }
+
+
+    public function test_it_validates_nullable_enum(): void
+    {
+        $schema = [
+            'properties' => [
+                'status' => [
+                    'type' => 'string',
+                    'enum' => ['pending', 'approved'],
+                    'nullable' => true
+                ]
+            ]
+        ];
+
+        //First case: null value is allowed
+        $dataNull = ['status' => null];
+        $this->assertTrue(StructuredResponseValidator::validate($dataNull, $schema));
+
+        //Second case: valid enum value is allowed
+        $dataValid = ['status' => 'approved'];
+        $this->assertTrue(StructuredResponseValidator::validate($dataValid, $schema));
+        //Case 3: Invalid value should be rejected
+    }
+
+
+    public function test_it_rejects_invalid_enum_for_nullable_field(): void
+    {
+        $schema = [
+            'properties' => [
+                'status' => [
+                    'type' => 'string',
+                    'enum' => ['pending', 'approved'],
+                    'nullable' => true
+                ]
+            ]
+        ];
+
+        $dataInvalid = ['status' => 'rejected'];
+
+        $this->expectException(RuntimeException::class);
+
+        $this->expectExceptionMessage("Field 'status' must be one of ['pending', 'approved'], ''rejected'' given.");
+
+        StructuredResponseValidator::validate($dataInvalid, $schema);
+    }
+
+
+    public function test_it_validates_nullable_array_of_objects(): void
+    {
+        $schema = [
+            'properties' => [
+                'users' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'nullable' => true,
+                        'required' => ['name'],
+                        'properties' => [
+                            'name' => ['type' => 'string']
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        //Success case: The array contains one valid object and one null object.
+        $data = [
+            'users' => [
+                ['name' => 'Ali'],
+                null
+            ]
+        ];
+
+        $this->assertTrue(StructuredResponseValidator::validate($data, $schema));
+    }
 }
