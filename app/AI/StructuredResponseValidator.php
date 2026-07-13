@@ -3,7 +3,6 @@
 namespace App\AI;
 
 use RuntimeException;
-use Whoops\Run;
 
 class StructuredResponseValidator
 {
@@ -252,7 +251,7 @@ class StructuredResponseValidator
     }
 
 
-    private function getExpectedTypes(array $schema): array
+    private static function getExpectedTypes(array $schema): array
     {
         $type = $schema['type'] ?? null;
 

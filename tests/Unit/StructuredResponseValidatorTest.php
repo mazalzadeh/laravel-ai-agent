@@ -138,4 +138,136 @@ class StructuredResponseValidatorTest extends TestCase
 
         StructuredResponseValidator::validate($data, $schema);
     }
+
+
+    public function test_it_allows_nullable_field_with_null_value(): void
+    {
+        $schema = [
+            'properties' => [
+                'nullable_field' => [
+                    'type' => 'string',
+                    'nullable' => true
+                ]
+            ],
+        ];
+        $data = ['nullable_field' => null];
+
+        $this->assertTrue(StructuredResponseValidator::validate($data, $schema));
+    }
+
+
+    public function test_it_rejects_null_for_non_nullable_field(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("Field 'non_nullable_field' cannot be null.");
+
+        $schema = [
+            'properties' => [
+                'non_nullable_field' => [
+                    'type' => 'string'
+                ]
+            ]
+        ];
+        $data = ['non_nullable_field' => null];
+
+        StructuredResponseValidator::validate($data, $schema);
+    }
+
+
+    public function test_it_allows_nullable_type_array_syntax(): void
+    {
+        $schema = [
+            'properties' => [
+                'nullable_field' => [
+                    'type' => ['string', 'null']
+                ]
+            ]
+        ];
+
+        //First case: null value is accepted
+        $dataWithNull = ['nullable_field' => null];
+        $this->assertTrue(StructuredResponseValidator::validate($dataWithNull, $schema));
+
+        //Second case: Non-null value with valid type is also accepted
+        $dataWithNull = ['nullable_field' => 'hello'];
+        $this->assertTrue(StructuredResponseValidator::validate($dataWithNull, $schema));
+    }
+
+
+    public function test_it_allows_nullable_true_syntax(): void
+    {
+        $schema = [
+            'properties' => [
+                'nullable_field' => [
+                    'type' => 'string',
+                    'nullable' => true
+                ]
+            ]
+        ];
+        $data = ['nullable_field' => null];
+
+        $this->assertTrue(StructuredResponseValidator::validate($data, $schema));
+    }
+
+
+    public function test_it_validates_nullable_array_items(): void
+    {
+        $schema = [
+            'properties' => [
+                'nullable_array' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'string',
+                        'nullable' => true
+                    ]
+                ]
+            ]
+        ];
+        $data = ['nullable_array' => [null, 'value1', null, 'value2']];
+
+        $this->assertTrue(StructuredResponseValidator::validate($data, $schema));
+    }
+
+
+    public function test_it_validates_nullable_nested_object(): void
+    {
+        $schema = [
+            'properties' => [
+                'nested' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'field' => ['type' => 'string']
+                    ]
+                ]
+            ]
+        ];
+
+        //First case: the entire nested object has a null value.
+        $dataNull = ['nested' => null];
+        $this->assertTrue(StructuredResponseValidator::validate($dataNull, $schema));
+
+        //Second case: The nested object has a value and its value is valid.
+        $dataNotNull = ['nested' => ['field' => 'value']];
+        $this->assertTrue(StructuredResponseValidator::validate($dataNotNull, $schema));
+    }
+
+
+    public function test_it_still_validates_non_null_nullable_field_type(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("Field 'nullable_field' must be of type 'string', 'integer' given.");
+
+        $schema = [
+            'properties' => [
+                'nullable_field' => [
+                    'type' => 'string',
+                    'nullable' => true
+                ]
+            ]
+        ];
+        $data = ['nullable_field' => 123]; //Non-null value with invalid type (integer instead of string)
+
+        StructuredResponseValidator::validate($data, $schema);
+    }
 }
