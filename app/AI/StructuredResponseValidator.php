@@ -60,6 +60,13 @@ class StructuredResponseValidator
 
             self::validateEnum($value, $propertySchema, $fieldPath);
 
+            self::validateConstraints(
+                $value,
+                $propertySchema,
+                $expectedTypes,
+                $fieldPath
+            );
+
             //Recursively validate nested objects
             if (in_array('object', $expectedTypes, true)) {
                 self::validateSchema(
@@ -264,5 +271,84 @@ class StructuredResponseValidator
         }
 
         return is_string($type) ? [$type] : [];
+    }
+
+
+    private static function validateConstraints(
+        mixed $value,
+        array $schema,
+        array $expectedTypes,
+        string $path,
+    ): void {
+
+        //String constraints
+        if (in_array('string', $expectedTypes, true)) {
+            $length = mb_strlen($value);
+
+            if (
+                array_key_exists('minLength', $schema)
+                && $length < $schema['minLength']
+            ) {
+                throw new RuntimeException(
+                    "Field '{$path}' must have a minimum length of {$schema['minLength']}."
+                );
+            }
+
+            if (
+                array_key_exists('maxLength', $schema)
+                && $length > $schema['maxLength']
+            ) {
+                throw new RuntimeException(
+                    "Field '{$path}' must have a maximum length of {$schema['maxLength']}."
+                );
+            }
+        }
+
+        //Numeric constraints
+        if (
+            in_array('integer', $expectedTypes, true)
+            || in_array('number', $expectedTypes, true)
+        ) {
+            if (
+                array_key_exists('minimum', $schema)
+                && $value < $schema['minimum']
+            ) {
+                throw new RuntimeException(
+                    "Field '{$path}' must be greater than or equal to {$schema['minimum']}."
+                );
+            }
+
+            if (
+                array_key_exists('maximum', $schema)
+                && $value > $schema['maximum']
+            ) {
+                throw new RuntimeException(
+                    "Field '{$path}' must be less than or equal to {$schema['maximum']}."
+                );
+            }
+        }
+
+        //Array constraints
+        if (in_array('array', $expectedTypes, true)) {
+            $itemCount = count($value);
+
+            if (
+                array_key_exists('minItems', $schema)
+                && $itemCount < $schema['minItems']
+            ) {
+                throw new RuntimeException(
+                    "Field '{$path}' must contain at least {$schema['minItems']} items."
+                );
+            }
+
+            if (
+                array_key_exists('maxItems', $schema)
+                && $itemCount > $schema['maxItems']
+            ) {
+                throw new RuntimeException(
+                    "Field '{$path}' must contain at most {$schema['maxItems']} items."
+                );
+            }
+        }
     }
 }

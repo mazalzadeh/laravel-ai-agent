@@ -367,4 +367,154 @@ class StructuredResponseValidatorTest extends TestCase
 
         $this->assertTrue(StructuredResponseValidator::validate($data, $schema));
     }
+
+
+    public function test_it_rejects_string_shortet_than_min_length(): void
+    {
+        $schema = [
+            'properties' => [
+                'title' => [
+                    'type' => 'string',
+                    'minLength' => 5,
+                ],
+            ],
+        ];
+
+        $data = ['title' => 'PHP'];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            "Field 'title' must have a minimum length of 5."
+        );
+
+        StructuredResponseValidator::validate($data, $schema);
+    }
+
+
+    public function test_it_rejects_string_longer_than_max_length(): void
+    {
+        $schema = [
+            'properties' => [
+                'title' => [
+                    'type' => 'string',
+                    'maxLength' => 5
+                ],
+            ],
+        ];
+
+        $data = ['title', 'Laravel'];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            "Field 'title' must have a maximum length of 5."
+        );
+
+        StructuredResponseValidator::validate($data, $schema);
+    }
+
+
+    public function test_it_allows_string_at_min_and_max_length_boundaries(): void
+    {
+        $schema=[
+            'properties'=>[
+                'code'=>[
+                    'type'=>'string',
+                    'minLength'=>3,
+                    'maxLength'=>3
+                ],
+            ],
+        ];
+
+        $this->assertTrue(StructuredResponseValidator::validate(['code'=>'PHP'],$schema));
+    }
+
+
+    public function test_it_rejects_number_below_minimum(): void
+    {
+        $schema = [
+            'properties' => [
+                'score' => [
+                    'type' => 'number',
+                    'minimum' => 0
+                ],
+            ],
+        ];
+
+        $data = ['score' => -0.5];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            "Field 'score' must be greater than or equal to 0."
+        );
+
+        StructuredResponseValidator::validate($data, $schema);
+    }
+
+
+    public function test_it_rejects_number_above_maximum(): void
+    {
+        $schema = [
+            'properties' => [
+                'score' => [
+                    'type' => 'number',
+                    'maximun' => 1
+                ],
+            ],
+        ];
+
+        $data = ['score' => 1.5];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            "Field 'score' must be less than or equal to 1."
+        );
+
+        StructuredResponseValidator::validate($data, $schema);
+    }
+
+
+    public function test_it_rejects_array_with_fewer_than_min_items(): void
+    {
+        $schema = [
+            'properties' => [
+                'topics' => [
+                    'type' => 'array',
+                    'minItems' => 2,
+                    'items' => ['type' => 'string'],
+                ],
+            ],
+        ];
+
+        $data = ['topics' => ['php']];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            "Field 'topics' must contain at least 2 items."
+        );
+
+        StructuredResponseValidator::validate($data, $schema);
+    }
+
+
+    public function test_it_rejects_array_with_more_than_max_items(): void
+    {
+        $schema = [
+            'properties' => [
+                'topics' => [
+                    'type' => 'array',
+                    'maxItems' => 2,
+                    'items' => ['type' => 'string'],
+                ],
+            ],
+        ];
+
+        $data = ['topics' => ['php', 'laravel', 'openai']];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            "Field 'topics' must contain at most 2 items."
+        );
+
+        StructuredResponseValidator::validate($data, $schema);
+    }
 }
