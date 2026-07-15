@@ -11,6 +11,8 @@ use Generator;
 use GrahamCampbell\ResultType\Success;
 use Illuminate\Support\Facades\Http;
 use Mockery;
+use PhpParser\Node\Expr\FuncCall;
+use RuntimeException;
 
 class AIServiceTest extends TestCase
 {
@@ -198,5 +200,175 @@ class AIServiceTest extends TestCase
     {
         Mockery::close();
         parent::tearDown();
+    }
+
+
+    public function test_structured_retries_when_first_response_is_invalid_json(): void
+    {
+        $fakeClient = new class implements AIClientInterface {
+            public int $callCount = 0;
+
+            public function chat(array $messages, array $options = []): array
+            {
+                $this->callCount++;
+
+                $content =
+                    $this->callCount === 1
+                    ? 'invalid json'
+                    : json_encode(['subject' => 'Server Maintenance', 'priority' => 'High']);
+
+                return [
+                    'success' => true,
+                    'data' => ['choices' => [['message' => ['role' => 'assistant', 'content' => $content,],],],]
+                ];
+            }
+
+            public function streamChat(array $messages, array $options = []): \Generator
+            {
+                yield from [];
+            }
+
+            public function embed(string $text): array
+            {
+                return [];
+            }
+        };
+
+        $schema = [
+            'type' => 'object',
+            'required' => ['subject', 'priority'],
+            'properties' => [
+                'subject' => ['type' => 'string'],
+                'priority' => ['type' => 'string'],
+            ],
+        ];
+
+        $service = new AIService($fakeClient);
+
+        $result = $service->structured('Analyze the server maintenance message.', $schema);
+
+        $this->assertSame('Server Maintenance', $result['subject']);
+        $this->assertSame('High', $result['priority']);
+        $this->assertSame(2, $fakeClient->callCount);
+    }
+
+
+    public function test_structured_retries_when_first_response_fails_schema_validation(): void
+    {
+        $fakeClient = new class implements AIClientInterface {
+            public int $callCount = 0;
+
+            public function chat(array $messages, array $options = []): array
+            {
+                $this->callCount++;
+
+                $content = $this->callCount === 1
+                    ? json_encode(['subject' => 'Server Maintenance',])
+                    : json_encode(['subject' => 'Server Maintenance', 'priority' => 'High']);
+
+                return [
+                    'success' => true,
+                    'data' => [
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => $content,
+                                ],
+                            ],
+                        ],
+                    ],
+                ];
+            }
+
+            public function streamChat(array $messages, array $options = []): \Generator
+            {
+                yield from [];
+            }
+
+            public function embed(string $text): array
+            {
+                return [];
+            }
+        };
+
+        $schema = [
+            'type' => 'object',
+            'required' => ['subject', 'priority'],
+            'properties' => [
+                'subject' => ['type' => 'string'],
+                'priority' => ['type' => 'string'],
+            ],
+        ];
+
+        $service = new AIService($fakeClient);
+
+        $result = $service->structured('Analyze the server maintenance message.', $schema);
+
+        $this->assertSame('Server Maintenance', $result['subject']);
+        $this->assertSame('High', $result['priority']);
+        $this->assertSame(2, $fakeClient->callCount);
+    }
+
+
+    public function test_structured_throws_exception_after_three_invalid_responses(): void
+    {
+        $fakeClient = new class implements AIClientInterface {
+            public int $callCount = 0;
+
+            public function chat(array $messages, array $options = []): array
+            {
+                $this->callCount++;
+
+                return [
+                    'success' => true,
+                    'data' => [
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => 'invalid json'
+                                ],
+                            ],
+                        ],
+                    ],
+                ];
+            }
+
+
+            public function streamChat(array $messages, array $options = []): \Generator
+            {
+                yield from [];
+            }
+
+            public function embed(string $text): array
+            {
+                return [];
+            }
+        };
+
+        $schema = [
+            'type' => 'object',
+            'required' => ['subject', 'priority'],
+            'properties' => [
+                'subject' => ['type' => 'string'],
+                'priority' => ['type' => 'string'],
+            ],
+        ];
+
+        $service = new AIService($fakeClient);
+
+        try {
+            $service->structured('Analyze the server maintenance message.', $schema);
+
+            $this->fail('Expected RuntimeException was not thrown.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(
+                'AI failed to return a valid JSON string.',
+                $exception->getMessage()
+            );
+
+            $this->assertSame(3, $fakeClient->callCount);
+        }
     }
 }

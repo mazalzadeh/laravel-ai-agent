@@ -8,6 +8,7 @@ use App\DTO\OpenAIErrorDTO;
 use App\Services\AIClient;
 use App\Clients\OpenAIClient;
 use Generator;
+use RuntimeException;
 
 class AIService
 {
@@ -85,7 +86,7 @@ class AIService
         return $this->client->embed($text);
     }
 
-    public function structured(string $prompt, array $schema): array
+    /*public function structured(string $prompt, array $schema): array
     {
         $system = "You must retrun ONLY valid matching this schema:\n" . json_encode($schema, JSON_PRETTY_PRINT);
 
@@ -104,5 +105,49 @@ class AIService
         //2. validate fields and types based on Schema
         StructuredResponseValidator::validate($data, $schema);
         return $data;
+    }*/
+
+
+    public function structured(string $prompt, array $schema): array
+    {
+        $system = "You must return ONLY valid JSON matching this schema:\n"
+            . json_encode($schema, JSON_PRETTY_PRINT);
+
+        $messages = [
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $prompt],
+        ];
+
+        $maxAttempts = 3;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $response = $this->chat($messages);
+
+            try {
+                $data = json_decode($response, true);
+
+                if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+                    throw new RuntimeException('AI failed to return a valid JSON string.');
+                }
+
+                StructuredResponseValidator::validate($data, $schema);
+
+                return $data;
+            } catch (RuntimeException $exception) {
+                if ($attempt === $maxAttempts) {
+                    throw $exception;
+                }
+
+                $messages[] = ['role' => 'assistant', 'content' => $response];
+
+                $messages[] = [
+                    'role' => 'user',
+                    'content' => 'Your previous response was invalid. '
+                        . $exception->getMessage()
+                        . ' Return only the corrected JSON.',
+                ];
+            }
+            throw new RuntimeException('AI failed to return a valid structured response.');
+        }
     }
 }
