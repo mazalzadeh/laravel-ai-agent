@@ -147,7 +147,8 @@ class AIService
                         . ' Return only the corrected JSON.',
                 ];
             }
-            throw new RuntimeException('AI failed to return a valid structured response.');
         }
+        throw new RuntimeException('AI failed to return a valid structured response.');
+
     }
 }
