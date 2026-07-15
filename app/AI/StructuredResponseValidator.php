@@ -168,6 +168,8 @@ class StructuredResponseValidator
 
             self::validateEnum($item, $itemSchema, $itemPath);
 
+            self::validateConstraints($item, $itemSchema, $expectedItemTypes, $itemPath);
+
             /*
             * Recursively validate object items.
             */

@@ -8,11 +8,21 @@ class SummarySchema
         return [
             "type" => "object",
             "properties" => [
-                "summary" => ["type" => "string"],
+                "summary" => [
+                    "type" => "string",
+                    "minLength" => 20,
+                    "maxLength" => 2000,
+                ],
                 "topics" => [
                     "type" => "array",
-                    "items" => ["type" => "string"]
-                ]
+                    "minItems" => 1,
+                    'maxItems' => 10,
+                    "items" => [
+                        "type" => "string",
+                        "minLength" => 2,
+                        "maxLength" => 100,
+                    ],
+                ],
             ],
             "required" => ["summary"]
         ];

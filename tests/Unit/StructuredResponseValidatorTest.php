@@ -402,7 +402,7 @@ class StructuredResponseValidatorTest extends TestCase
             ],
         ];
 
-        $data = ['title', 'Laravel'];
+        $data = ['title' => 'Laravel'];
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
@@ -457,7 +457,7 @@ class StructuredResponseValidatorTest extends TestCase
             'properties' => [
                 'score' => [
                     'type' => 'number',
-                    'maximun' => 1
+                    'maximum' => 1
                 ],
             ],
         ];
