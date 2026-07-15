@@ -3,7 +3,8 @@
 namespace Tests\Unit;
 
 use App\DTO\ChatResponseDTO;
-use PHPUnit\Framework\TestCase;
+//use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 use Tests\Unit;
 use App\Services\AIService;
 use App\Services\AIClientInterface;
@@ -368,7 +369,176 @@ class AIServiceTest extends TestCase
                 $exception->getMessage()
             );
 
-            $this->assertSame(3, $fakeClient->callCount);
+            $this->assertSame(4, $fakeClient->callCount);
         }
+    }
+
+
+    public function test_structured_returns_data_from_native_openai_response(): void
+    {
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'summary' => ['type' => 'string'],
+                'priority' => ['type' => 'string'],
+            ],
+            'required' => ['summary', 'priority'],
+        ];
+
+        $jsonResponse = json_encode([
+            'summary' => 'Payment issue detected',
+            'priority' => 'high',
+        ]);
+
+        $client = $this->createMock(AIClientInterface::class);
+
+        //We expect chat to be called only once and it must include response_format.
+        $client->expects($this->once())
+            ->method('chat')
+            ->with(
+                $this->isArray(),
+                $this->callback(function (array $options) use ($schema) {
+                    return isset($options['response_format']['type'])
+                        && $options['response_format']['type'] === 'json_schema'
+                        && ($options['response_format']['json_schema']['schema'] ?? null) === $schema
+                        && ($options['temperature'] ?? null) === 0;
+                })
+            )->willReturn([
+                'success' => true,
+                'data' => [
+                    'choices' => [
+                        [
+                            'message' => [
+                                'role' => 'assistant',
+                                'content' => $jsonResponse,
+                            ],
+                        ],
+                    ],
+                ],
+            ]);
+
+        $service = new AIService($client);
+
+        $result = $service->structured('Analyze this ticket', $schema);
+
+        $this->assertSame(['summary' => 'Payment issue detected', 'priority' => 'high'], $result);
+    }
+
+
+    public function test_structured_falls_back_when_native_path_fails(): void
+    {
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'summary' => ['type' => 'string'],
+                'priority' => ['type' => 'string'],
+            ],
+            'required' => ['summary', 'priority'],
+        ];
+
+        $fallbackJson = json_encode([
+            'summary' => 'Server outage confirmed',
+            'priority' => 'urgent',
+        ]);
+
+        $client = $this->createMock(AIClientInterface::class);
+
+        $client->expects($this->exactly(2))
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, array $options = []) use ($schema, $fallbackJson) {
+                static $callCount = 0;
+                $callCount++;
+
+                if ($callCount === 1) {
+                    if (
+                        !isset($options['response_format']['type']) ||
+                        $options['response_format']['type'] !== 'json_schema' ||
+                        ($options['response_format']['json_schema']['schema'] ?? null)
+                    ) {
+                        $this->fail('First call must use native json_schema response_format.');
+                    }
+
+                    throw new RuntimeException('OpenAI native structured output failed.');
+                }
+
+                if (isset($options['response_format'])) {
+                    $this->fail('Fallback call must not include response_format.');
+                }
+
+                return [
+                    'success' => true,
+                    'data' => [
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => $fallbackJson,
+                                ],
+                            ],
+                        ],
+                    ],
+                ];
+            });
+
+        $service = new AIService($client);
+
+        $result = $service->structured('Analyze this outage report', $schema);
+
+        $this->assertSame(['summary' => 'Server outage confirmed', 'priority' => 'urgent'], $result);
+    }
+
+
+    public function test_structured_throws_when_native_and_all_fallback_attempts_fail(): void
+    {
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'summary' => ['type' => 'string'],
+                'priority' => ['type' => 'string'],
+            ],
+            'required' => ['summary', 'priority'],
+        ];
+
+        $client = $this->createMock(AIClientInterface::class);
+
+        $client->expects($this->exactly(4))
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, array $options = []) use ($schema) {
+                static $callCount = 0;
+                $callCount++;
+
+                if ($callCount === 1) {
+                    if (
+                        !isset($options['response_format']['type']) ||
+                        $options['response_format']['type'] !== 'json_schema' ||
+                        ($options['response_format']['json_schema']['schema'] ?? null)
+                    ) {
+                        $this->fail('First call must use native json_schema response_format.');
+                    }
+
+                    throw new RuntimeException('Native structured output failed.');
+                }
+
+                return [
+                    'success' => true,
+                    'data' => [
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => 'not-a-valid-json-response',
+                                ],
+                            ],
+                        ],
+                    ],
+                ];
+            });
+
+        $service = new AIService($client);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('AI failed to return a valid JSON string.');
+
+        $service->structured('Analyze this broken input', $schema);
     }
 }

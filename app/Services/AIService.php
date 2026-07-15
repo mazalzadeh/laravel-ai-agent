@@ -8,6 +8,7 @@ use App\DTO\OpenAIErrorDTO;
 use App\Services\AIClient;
 use App\Clients\OpenAIClient;
 use Generator;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class AIService
@@ -68,7 +69,7 @@ class AIService
 
         $options = [
             'response_format' => ['type' => 'json_object'],
-            'temprature' => 0
+            'temperature' => 0
         ];
 
         $responseContent = $this->chat($messages, $options);
@@ -119,6 +120,32 @@ class AIService
         ];
 
         $maxAttempts = 3;
+
+        $nativeOptions = [
+            'response_format' => [
+                'type' => 'json_schema',
+                'json_schema' => [
+                    'name' => 'structured_response',
+                    'schema' => $schema
+                ],
+            ],
+            'temperature' => 0,
+        ];
+
+        try {
+            $response = $this->chat($messages, $nativeOptions);
+
+            $data = json_decode($response, true);
+
+            if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
+                StructuredResponseValidator::validate($data, $schema);
+                return $data;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Native structured output failed, falling back to retry-based flow.', [
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             $response = $this->chat($messages);
