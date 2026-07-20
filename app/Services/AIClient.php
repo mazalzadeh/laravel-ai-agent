@@ -2,19 +2,20 @@
 
 namespace App\Services;
 
-// use Illuminate\Support\Facades\Http;
 
 class AIClient
 {
-    // public function chat(string $message)
-    // {
-    //     // dd('aiclient');
-    //     $response = Http::post(
-    //         'http://localhost:8080/api/fake-openai/chat',['model' => 'gpt-4','message' => [['role' => 'user','content' => $message]]]);
-
-    //     return $response->json();
-    // }
-
+    /**
+     * Return a mock chat completion response for the given message.
+     *
+     * This method simulates a chat completion payload and does not make a real API
+     * request. It is useful for testing or local development when a fake response
+     * structure is needed.
+     *
+     * @param string $message The user message to include in the mocked assistant reply.
+     *
+     * @return array A fake chat completion response structure.
+     */
     public function chat(string $message)
     {
         return [

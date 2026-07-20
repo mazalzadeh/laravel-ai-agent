@@ -17,6 +17,12 @@ class OpenAIClient implements AIClientInterface
     private string $baseUrl;
     private string $model;
 
+    /**
+     * Create a new OpenAI client instance from the application configuration.
+     *
+     * Loads the API key, base URL, and default model from the configured
+     * OpenAI service settings, applying fallback defaults where needed.
+     */
     public function __construct()
     {
         $this->apiKey = config('services.openai.key') ?? '';
@@ -25,7 +31,22 @@ class OpenAIClient implements AIClientInterface
     }
 
 
-
+    /**
+     * Send a chat completion request and return either a parsed response or a normalized error.
+     *
+     * Builds the request payload from the configured model, the provided messages,
+     * and any supported options. Retries transient HTTP and connection failures
+     * before returning either a `ChatResponseDTO` instance or a normalized
+     * `OpenAIErrorDTO`.
+     *
+     * @param array $message The chat message payload sent to the API.
+     * @param array $options Additional request options such as temperature, max tokens, or top_p.
+     *
+     * @return array A normalized result array containing:
+     *               - `success` (bool): Whether the request succeeded.
+     *               - `data` (ChatResponseDTO): Present on success.
+     *               - `error` (OpenAIErrorDTO): Present on failure.
+     */
     public function chat(array $message, array $options = []): array
     {
         $payload = array_merge([
@@ -86,7 +107,21 @@ class OpenAIClient implements AIClientInterface
         }
     }
 
-
+    /**
+     * Send a streaming chat completion request and yield incremental content fragments from the API response.
+     *
+     * Builds a streaming chat completion payload, sends it to the API, and reads
+     * the server-sent event stream line by line. Each non-empty content fragment
+     * found in the response delta is yielded as it arrives.
+     *
+     * @param array $messages The chat messages sent to the API.
+     * @param array $options Additional request options such as temperature, max tokens, or top_p.
+     *
+     * @return Generator<string> A generator that yields streamed content chunks.
+     *
+     * @throws \RuntimeException If the streaming request fails, the connection is interrupted,
+     *                           or an unexpected streaming error occurs.
+     */
     public function streamChat(array $messages, array $options = []): Generator
     {
         $payload = array_merge([
@@ -161,6 +196,18 @@ class OpenAIClient implements AIClientInterface
         }
     }
 
+    /**
+     * Generate an embedding vector for the given text using the OpenAI embeddings API.
+     *
+     * Sends the provided text to the embeddings endpoint using the configured API
+     * token and returns the first embedding vector from the response payload.
+     *
+     * @param string $text The input text to convert into an embedding vector.
+     *
+     * @return array The numeric embedding vector returned by the API.
+     *
+     * @throws \Exception If the embedding request fails.
+     */
     public function embed(string $text): array
     {
         $response = Http::withToken($this->apiKey)
@@ -177,7 +224,16 @@ class OpenAIClient implements AIClientInterface
     }
 
 
-
+    /**
+     * Extract the error type from the API response payload.
+     *
+     * Reads the JSON response body and returns the nested error type if it is
+     * present in the API error structure.
+     *
+     * @param Response $response The HTTP response returned by the API.
+     *
+     * @return string|null The error type when available, otherwise null.
+     */
     private function extractErrorType(Response $response): ?string
     {
         $json = $response->json();
@@ -185,6 +241,17 @@ class OpenAIClient implements AIClientInterface
         return $json['error']['type'] ?? null;
     }
 
+    /**
+     * Read a single trimmed line from the given stream.
+     *
+     * Consumes the stream one character at a time until a newline character is
+     * reached or the end of the stream is encountered, then returns the trimmed
+     * line contents.
+     *
+     * @param mixed $stream The readable stream instance.
+     *
+     * @return string The trimmed line read from the stream.
+     */
     private function readLine($stream): string
     {
         $buffer = '';
@@ -203,7 +270,17 @@ class OpenAIClient implements AIClientInterface
     }
 
 
-
+    /**
+     * Determine whether the given exception represents a retryable failure.
+     *
+     * Returns true for network connection failures and for exceptions that expose
+     * an HTTP response with a transient status code such as 429 or 5xx retryable
+     * server errors.
+     *
+     * @param mixed $exception The thrown exception or error candidate to inspect.
+     *
+     * @return bool True if the failure is considered temporary and should be retried.
+     */
     private function shouldRetry(mixed $exception): bool
     {
         //Retry on network errors
@@ -219,7 +296,16 @@ class OpenAIClient implements AIClientInterface
         return false;
     }
 
-
+    /**
+     * Convert an API error response into a normalized OpenAI error DTO.
+     *
+     * Reads the response payload and wraps the error details in an
+     * `OpenAIErrorDTO` instance using the response body and HTTP status code.
+     *
+     * @param Response $response The failed HTTP response returned by the API.
+     *
+     * @return OpenAIErrorDTO A normalized error DTO built from the API response.
+     */
     private function handleError(Response $response): OpenAIErrorDTO
     {
         $json = $response->json();
@@ -232,7 +318,16 @@ class OpenAIClient implements AIClientInterface
         );
     }
 
-
+    /**
+     * Filter the given options array to include only supported API parameters.
+     *
+     * Removes any unsupported or unexpected options and returns only the keys
+     * that are explicitly allowed to be sent with the API request payload.
+     *
+     * @param array $options The raw request options provided by the caller.
+     *
+     * @return array The filtered options array containing only allowed parameters.
+     */
     private function filterOptions(array $options): array
     {
         $allowedOptions = [

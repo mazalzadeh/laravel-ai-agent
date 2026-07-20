@@ -8,10 +8,22 @@ use App\AI\Schema\SummarySchema;
 
 class DocumentAnalysisService
 {
+    /**
+     * Create a new document analysis service instance.
+     *
+     * @param AIService $ai The AI service used for structured text analysis.
+     */
     public function __construct(
         private AIService $ai
     ) {}
 
+    /**
+     * Summarize a document and extract its main topics.
+     *
+     * @param string $text The input document text.
+     *
+     * @return array The structured summary result.
+     */
     public function summarize(string $text): array
     {
         $prompt = "Summarize this document and extract topics:\n\n" . $text;
@@ -20,6 +32,13 @@ class DocumentAnalysisService
         return $this->ai->structured($prompt, SummarySchema::schema());
     }
 
+    /**
+     * Classify a support ticket or similar text.
+     *
+     * @param string $text The input text to classify.
+     *
+     * @return array The structured classification result.
+     */
     public function classify(string $text): array
     {
         return $this->ai->structured(
@@ -28,6 +47,13 @@ class DocumentAnalysisService
         );
     }
 
+    /**
+     * Extract payment-related entities from the given text.
+     *
+     * @param string $text The input text containing payment details.
+     *
+     * @return array The structured entity extraction result.
+     */
     public function extractEntities(string $text): array
     {
         $schema = [

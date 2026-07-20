@@ -10,6 +10,18 @@ class ChatController extends Controller
 {
     public function __construct(protected AIService $aiservice){}
 
+    /**
+     * Validate the incoming message, send it to the AI service, and return the reply as JSON.
+     *
+     * Accepts a user message from the HTTP request, validates it, transforms it
+     * into the chat message format expected by the AI service, and returns the
+     * service response in a JSON payload.
+     *
+     * @param Request $request The incoming HTTP request containing the user message.
+     * @param AIService $ai The AI service used to generate a chat response.
+     *
+     * @return \Illuminate\Http\JsonResponse The JSON response containing the AI reply.
+     */
     public function chat(Request $request, AIService $ai)
     {
         $validated = $request->validate(['message' => ['required', 'string'],]);
@@ -21,6 +33,17 @@ class ChatController extends Controller
         return response()->json(['reply' => $reply]);
     }
 
+    /**
+     * Validate incoming chat messages, stream AI response chunks, and return them as Server-Sent Events.
+     *
+     * Accepts an array of chat messages, validates the required structure, forwards
+     * the messages to the AI streaming service, and emits each returned chunk as an
+     * SSE `data:` event. A final `[DONE]` marker is sent when streaming completes.
+     *
+     * @param Request $request The incoming HTTP request containing the chat messages.
+     *
+     * @return StreamedResponse The streamed SSE response containing incremental AI output.
+     */
     public function stream(Request $request): StreamedResponse
     {
         $validated = $request->validate([

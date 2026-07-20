@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\RagChatRequest;
-use App\Services\AIService;
-use App\Services\VectorSimilarityService;
 use App\Services\RagService;
 
 class RagChatController extends Controller
@@ -14,7 +12,14 @@ class RagChatController extends Controller
     ) {}
 
     /**
-     * Handle the incoming request.
+     * Handle the incoming RAG chat request and return the generated answer as JSON.
+     *
+     * Retrieves the validated question from the request, forwards it to the RAG
+     * service, and returns the generated result in a JSON response.
+     *
+     * @param RagChatRequest $request The incoming request containing the user question.
+     *
+     * @return \Illuminate\Http\JsonResponse The JSON response containing the RAG result.
      */
     public function __invoke(RagChatRequest $request)
     {
@@ -23,39 +28,4 @@ class RagChatController extends Controller
         return response()->json($result);
     }
 
-
-
-    /*public function __invoke(RagChatRequest $request)
-    {
-        $question = $request->question;
-        $limit = $request->limit ?? 5;
-
-        $embedding = $this->ai->embed($question);
-
-        $results = $this->simililarity->findMostSimilar($embedding, $limit);
-
-        $context = collect($results)->pluck('document.content')->implode("\n\n---\n\n");
-
-        $messages = [
-            [
-                'role' => 'system',
-                'content' => 'Answer using the provided context only.'
-            ],
-            [
-                'role' => 'user',
-                'content' => "Context:\n{$context}\n\nQuestion:\n{$question}"
-            ]
-        ];
-
-        $answer = $this->ai->chat($messages);
-
-        return response()->json([
-            'question' => $question,
-            'answer' => $answer,
-            'sources' => collect($results)->map(fn($r) => [
-                'content' => $r['document']->content,
-                'score' => $r['score'],
-            ]),
-        ]);
-    }*/
 }

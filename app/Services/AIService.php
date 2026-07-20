@@ -5,8 +5,6 @@ namespace App\Services;
 use App\AI\StructuredResponseValidator;
 use App\DTO\ChatResponseDTO;
 use App\DTO\OpenAIErrorDTO;
-use App\Services\AIClient;
-use App\Clients\OpenAIClient;
 use Generator;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -14,24 +12,38 @@ use RuntimeException;
 class AIService
 {
     protected AIClientInterface $client;
-
+    /**
+     * Create a new AI service instance with the given AI client implementation.
+     *
+     * Injects the AI client dependency used to perform chat, streaming, and
+     * embedding operations through a shared interface abstraction.
+     *
+     * @param AIClientInterface $client The AI client implementation used by the service.
+     */
     public function __construct(AIClientInterface $client)
     {
         $this->client = $client;
     }
 
+    /**
+     * Execute a chat request and resolve the response into a user-friendly string.
+     *
+     * Sends the provided messages and options to the AI client, then normalizes
+     * the result into a plain text response. On success, it extracts the assistant
+     * content from either a ‍DTO instance or a raw response array. On failure, it
+     * maps known AI error types to readable messages and falls back to a generic
+     * error string when the error cannot be classified.
+     *
+     * @param array $messages The chat messages to send to the AI model.
+     * @param array $options Optional generation or request options.
+     *
+     * @return string The assistant response content or a human-readable error message.
+     */
     public function chat(array $messages, array $options = []): string
     {
         $response = $this->client->chat($messages, $options);
 
         //success
-        /*if (($response['success'] ?? false) === true) {
-            $dto = $response['data'];
-            //return $dto->content ?: 'No response content from AI.';
-            $content = $dto['choices'][0]['message']['content'] ?? 'No response content from AI.';
-            return $content ?: 'No response content from AI.';
-        }*/
-
         if (($response['success'] ?? false) == true) {
             $data = $response['data'];
 
@@ -60,6 +72,18 @@ class AIService
         return 'An unknown error occurred while communicating with the AI.';
     }
 
+    /**
+     * Analyze the given text to extract its subject, priority, and summary.
+     *
+     * Sends a structured prompt to the AI model asking for a specific JSON layout
+     * containing subject, priority, and summary keys. By setting the response format
+     * to JSON and the temperature to 0, it enforces deterministic, structured outputs.
+     * The raw JSON string returned by the chat API is decoded into an associative PHP array.
+     *
+     * @param string $text The input text content to be analyzed.
+     *
+     * @return array{subject?: string, priority?: string, summary?: string} The structured analysis result, or an empty array on failure.
+     */
     public function analyzeText(string $text): array
     {
         $messages = [
@@ -77,38 +101,55 @@ class AIService
         return json_decode($responseContent, true) ?? [];
     }
 
+    /**
+     * Proxy the streaming chat request to the underlying AI client.
+     *
+     * This method delegates the streaming conversation to the client implementation.
+     * It returns a PHP Generator, allowing the caller to iterate over response
+     * fragments as they arrive from the AI provider in real-time.
+     *
+     * @param array $messages The collection of messages representing the chat history.
+     * @param array $options  Optional parameters to tune the AI model's behavior.
+     *
+     * @return \Generator Yields incremental string fragments of the AI's response.
+     */
     public function streamChat(array $messages, array $options = []): Generator
     {
         return $this->client->streamChat($messages, $options);
     }
 
+    /**
+     * Generate a numeric vector representation (embedding) for the provided text.
+     *
+     * Forwards the input text to the underlying AI client's embedding model.
+     * The resulting array (vector) represents the semantic meaning of the text,
+     * which can be used for similarity searches or clustering in a vector database.
+     *
+     * @param string $text The input string to be converted into a vector.
+     *
+     * @return array The numerical vector array representing the text's semantic features.
+     */
     public function embed(string $text): array
     {
         return $this->client->embed($text);
     }
 
-    /*public function structured(string $prompt, array $schema): array
-    {
-        $system = "You must retrun ONLY valid matching this schema:\n" . json_encode($schema, JSON_PRETTY_PRINT);
-
-        $response = $this->chat([
-            ['role' => 'system', 'content' => $system],
-            ['role' => 'user', 'content' => $prompt],
-        ]);
-
-        $data = json_decode($response, true);
-
-        //1. check JSON structure
-        if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
-            throw new \RuntimeException("AI failed to retrun a valid Json string.");
-        }
-
-        //2. validate fields and types based on Schema
-        StructuredResponseValidator::validate($data, $schema);
-        return $data;
-    }*/
-
-
+    /**
+     * Execute a structured response request enforcing strict compliance with a given JSON schema.
+     *
+     * This method runs a dual-layered verification flow:
+     * 1. Native API Enforcement: Attempts to retrieve the response using the client's native
+     *    `json_schema` response format with a deterministic temperature (0).
+     * 2. Self-Correcting Fallback Loop: If the native approach fails or validation throws an exception,
+     *    it falls back to a manual retry loop (up to 3 attempts). It appends the invalid output and
+     *    validation error to the message history, prompting the AI to self-correct and output a valid structure.
+     *
+     * @param string $prompt The user prompt instructions.
+     * @param array  $schema The JSON Schema array specifying the required keys and types.
+     *
+     * @throws \RuntimeException If all retry attempts exhaust without generating a valid schema-compliant response.
+     * @return array The decoded associative array matching the specified schema.
+     */
     public function structured(string $prompt, array $schema): array
     {
         $system = "You must return ONLY valid JSON matching this schema:\n"
@@ -176,6 +217,5 @@ class AIService
             }
         }
         throw new RuntimeException('AI failed to return a valid structured response.');
-
     }
 }

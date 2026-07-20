@@ -6,6 +6,19 @@ use RuntimeException;
 
 class StructuredResponseValidator
 {
+    /**
+     * Validate the given data against the provided schema.
+     *
+     * Delegates the actual validation logic to the internal schema validator and
+     * returns `true` when the payload satisfies the schema requirements.
+     *
+     * @param array $data The structured response data to validate.
+     * @param array $schema The schema definition used to validate the data.
+     *
+     * @return bool True when the data is valid.
+     *
+     * @throws \RuntimeException When the data does not match the schema.
+     */
     public static function validate(array $data, array $schema): bool
     {
         self::validateSchema($data, $schema);
@@ -13,7 +26,24 @@ class StructuredResponseValidator
         return true;
     }
 
-
+    /**
+     * Recursively validate the given data against the provided schema.
+     *
+     * Checks required fields, validates property types, applies enum and
+     * constraint rules, and recursively validates nested objects and arrays
+     * defined in the schema.
+     *
+     * Fields that are not defined in the schema properties are ignored.
+     *
+     * @param array $data The structured response data to validate.
+     * @param array $schema The schema definition used for validation.
+     * @param string $path The current dot-notated path for nested validation.
+     *
+     * @return void
+     *
+     * @throws \RuntimeException When required fields are missing or any value
+     * violates the schema rules.
+     */
     private static function validateSchema(
         array $data,
         array $schema,
@@ -87,6 +117,21 @@ class StructuredResponseValidator
     }
 
 
+    /**
+     * Validate that the given value matches the schema enum constraints.
+     *
+     * If the schema defines an `enum` list, the value must match one of the
+     * allowed entries using strict comparison. Nullable values are accepted
+     * when the schema explicitly allows `null`.
+     *
+     * @param mixed $value The value to validate.
+     * @param array $schema The schema definition that may contain enum rules.
+     * @param string $path The dot-notated field path used in validation errors.
+     *
+     * @return void
+     *
+     * @throws \RuntimeException When the value is not included in the allowed enum list.
+     */
     private static function validateEnum(
         mixed $value,
         array $schema,
@@ -124,6 +169,21 @@ class StructuredResponseValidator
     }
 
 
+    /**
+     * Validate each array item against the schema defined in the `items` property.
+     *
+     * Applies nullable checks, type validation, enum validation, and additional
+     * constraints to every item in the array. Object and nested array items are
+     * validated recursively using their corresponding item schema.
+     *
+     * @param array $items The array items to validate.
+     * @param array $schema The parent schema containing the `items` definition.
+     * @param string $path The dot-notated field path used in validation errors.
+     *
+     * @return void
+     *
+     * @throws \RuntimeException When any array item violates the item schema.
+     */
     private static function validateArrayItems(
         array $items,
         array $schema,
@@ -187,6 +247,18 @@ class StructuredResponseValidator
     }
 
 
+    /**
+     * Determine whether the given value matches the expected schema type.
+     *
+     * Uses PHP type checks for supported schema types. JSON objects are treated as
+     * arrays because decoded JSON objects become associative arrays when using
+     * `json_decode($json, true)`.
+     *
+     * @param mixed $value The value to validate.
+     * @param string $expectedType The expected schema type.
+     *
+     * @return bool True when the value matches the expected type.
+     */
     private static function matchesType(
         mixed $value,
         string $expectedType
@@ -209,7 +281,17 @@ class StructuredResponseValidator
         };
     }
 
-    //Compares the value against all allowed types. If it matches at least one of them, it returns true.
+    /**
+     * Check whether the given value matches at least one of the expected schema types.
+     *
+     * Iterates through the allowed schema types and returns `true` as soon as the
+     * value matches one of them.
+     *
+     * @param mixed $value The value to validate.
+     * @param array $expectedTypes The list of allowed schema types.
+     *
+     * @return bool True when the value matches at least one expected type.
+     */
     private static function matchesAnyType(mixed $value, array $expectedTypes): bool
     {
         foreach ($expectedTypes as $expectedType) {
@@ -222,6 +304,16 @@ class StructuredResponseValidator
     }
 
 
+    /**
+     * Return the normalized schema-friendly type name for the given value.
+     *
+     * Converts PHP-specific type names such as `double` and `NULL` into
+     * more consistent schema-oriented names for validation error messages.
+     *
+     * @param mixed $value The value whose actual type should be resolved.
+     *
+     * @return string The normalized type name.
+     */
     private static function getActualType(mixed $value): string
     {
         return match (gettype($value)) {
@@ -231,7 +323,17 @@ class StructuredResponseValidator
         };
     }
 
-
+    /**
+     * Build the full dot-notated path for a nested schema field.
+     *
+     * Returns the field name as-is when there is no parent path, otherwise
+     * appends it to the parent path using dot notation.
+     *
+     * @param string $parentPath The current parent path.
+     * @param string $field The field name to append.
+     *
+     * @return string The full dot-notated field path.
+     */
     private static function buildPath(
         string $parentPath,
         string $field,
@@ -243,7 +345,16 @@ class StructuredResponseValidator
         return "{$parentPath}.{$field}";
     }
 
-
+    /**
+     * Determine whether the schema allows null values.
+     *
+     * A field is considered nullable when the schema explicitly sets `nullable`
+     * to `true` or includes `null` in its `type` definition.
+     *
+     * @param array $schema The schema definition to inspect.
+     *
+     * @return bool True when null values are allowed.
+     */
     private static function isNullable(array $schema): bool
     {
         if (($schema['nullable'] ?? false) === true) {
@@ -259,7 +370,17 @@ class StructuredResponseValidator
         return false;
     }
 
-
+    /**
+     * Normalize the schema type definition into an array of non-null types.
+     *
+     * Extracts the types from the schema and filters out `null`, ensuring
+     * a consistent array format regardless of whether the schema defines
+     * a single type string or an array of types.
+     *
+     * @param array $schema The schema definition to extract types from.
+     *
+     * @return string[] An array of expected non-null data types.
+     */
     private static function getExpectedTypes(array $schema): array
     {
         $type = $schema['type'] ?? null;
@@ -275,7 +396,22 @@ class StructuredResponseValidator
         return is_string($type) ? [$type] : [];
     }
 
-
+    /**
+     * Validate additional schema constraints for the given value.
+     *
+     * Applies type-specific rules such as string length limits, numeric
+     * minimum and maximum bounds, and array item count constraints based
+     * on the expected schema types.
+     *
+     * @param mixed $value The value to validate.
+     * @param array $schema The schema definition containing constraint rules.
+     * @param array $expectedTypes The normalized list of expected non-null types.
+     * @param string $path The dot-notated field path used in validation errors.
+     *
+     * @return void
+     *
+     * @throws \RuntimeException When the value violates any supported constraint.
+     */
     private static function validateConstraints(
         mixed $value,
         array $schema,
