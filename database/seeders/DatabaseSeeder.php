@@ -2,7 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use App\Models\DocumentChunk;
+use App\Models\Document;
+use App\Models\EmbeddingCache;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -15,11 +17,22 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        Document::factory()
+            ->count(5)
+            ->create()
+            ->each(function(Document $document){
+                $chunkCount=rand(2,5);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+                for($i=0;$i<$chunkCount;$i++){
+                    DocumentChunk::factory()->create(
+                        [
+                            'document_id'=>$document->id,
+                            'chunk_index'=> $i,
+                        ]
+                    );
+                }
+            });
+
+        EmbeddingCache::factory()->count(10)->create();
     }
 }
