@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 use App\Models\Document;
+use App\Models\DocumentChunk;
 use App\Services\AIClientInterface;
 use App\Services\FakeOpenAIClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,16 +23,18 @@ class RagChatTest extends TestCase
 
     private function createDocumentWithChunk(string $content, array $embedding): Document
     {
-        $document = Document::create([
+        $document = Document::factory()->create([
             'content' => $content,
             'embedding' => $embedding,
         ]);
 
-        $document->chunks()->create([
-            'chunk_index' => 0,
-            'content' => $content,
-            'embedding' => $embedding,
-        ]);
+        DocumentChunk::factory()
+            ->for($document)
+            ->create([
+                'chunk_index' => 0,
+                'content' => $content,
+                'embedding' => $embedding,
+            ]);
 
         return $document;
     }

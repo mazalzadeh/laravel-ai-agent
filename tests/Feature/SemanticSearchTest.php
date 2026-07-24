@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 use App\Models\Document;
+use App\Models\DocumentChunk;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class SemanticSearchTest extends TestCase
@@ -28,23 +29,40 @@ class SemanticSearchTest extends TestCase
 
     public function test_semantic_search_returns_results()
     {
-        $document = $this->createDocumentWithChunk(
-            'Laravel is a PHP framework',
-            array_fill(0, 16, 0.5)
-        );
+
+        $embedding = array_fill(0, 16, 0.5);
+
+        $document = Document::factory()->create();
+
+        $chunk = DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'chunk_index' => 0,
+            'content' => 'Laravel is a PHP framework',
+            'embedding' => $embedding,
+        ]);
+
+        $this->assertEquals(1, DocumentChunk::count());
+        $this->assertEquals('Laravel is a PHP framework', $chunk->content);
+
+        $this->assertDatabaseCount('document_chunks', 1);
+
+        $this->assertDatabaseHas('document_chunks', [
+            'content' => 'Laravel is a PHP framework',
+        ]);
 
         $response = $this->postJson('/api/semantic-search', [
             'query' => 'PHP framework'
         ]);
 
-        $response->assertStatus(200)->assertJsonStructure([
-            'query',
-            'results' => [
-                [
-                    'content',
-                    'score',
-                ],
-            ],
-        ]);
+        $response->assertOk()->assertJsonPath('query', 'PHP framework');
+
+        $results = $response->json('results');
+
+        $this->assertNotEmpty($results, 'Results array is empty');
+
+        $this->assertContains(
+            'Laravel is a PHP framework',
+            array_column($results, 'content')
+        );
     }
 }

@@ -39,10 +39,10 @@ class SemanticSearchController extends Controller
             'query' => $query,
             'results' => $results->map(function ($item) {
                 return [
-                    'content' => $item['document']->content,
+                    'content' => $item['chunk']->content,
                     'score' => $item['score']
                 ];
-            })
+            })->values()
         ]);
     }
 }

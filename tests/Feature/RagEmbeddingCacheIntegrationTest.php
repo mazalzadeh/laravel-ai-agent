@@ -20,44 +20,25 @@ class RagEmbeddingCacheIntegrationTest extends TestCase
         $question = 'What is Laravel?';
 
         //Fake AIService
-        /*$ai = new class {
-            public int $embedCalls = 0;
-
-            public function embed(string $text): array
-            {
-                $this->embedCalls++;
-
-                // deterministic vector
-                return [0.1, 0.2, 0.3];
-            }
-
-            public function chat(array $messages): string
-            {
-                return 'Laravel is a PHP framework';
-            }
-        };*/
         $ai = \Mockery::mock(\App\Services\AIService::class);
 
         $ai->shouldReceive('embed')->once()->andReturn([0.1, 0.2, 0.3]);
 
         $ai->shouldReceive('chat')->twice()->andReturn('Laravel is a PHP framework.');
 
-        $this->app->instance(\App\Services\AIService::class, $ai);
-
         $this->app->instance(AIService::class, $ai);
 
         //Create document+chunk
-        $doc = Document::create([
+        $document = Document::factory()->create([
             'content' => 'Laravel is a PHP framework for web development.',
             'embedding' => [0.1, 0.2, 0.3],
         ]);
 
-        DocumentChunk::create([
-            'document_id' => $doc->id,
-            'chunk_index' => 0,
-            'content' => 'Laravel is a PHP framework for web development.',
-            'embedding' => [0.1, 0.2, 0.3],
-        ]);
+        DocumentChunk::factory()->for($document)->create([
+                'chunk_index' => 0,
+                'content' => 'Laravel is a PHP framework for web development.',
+                'embedding' => [0.1, 0.2, 0.3],
+            ]);
 
         $rag = app(RagService::class);
 
@@ -69,5 +50,7 @@ class RagEmbeddingCacheIntegrationTest extends TestCase
 
         //Cache should contain one record
         $this->assertDatabaseCount('embedding_caches', 1);
+
+        $this->assertDatabaseHas('embedding_caches', ['text' => $question]);
     }
 }

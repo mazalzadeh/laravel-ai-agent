@@ -51,7 +51,7 @@ class EmbeddingCacheServiceTest extends TestCase
         ]);
     }
 
-    public function test_same_text_with_different_model_creates_seoarate_cache_record(): void
+    public function test_same_text_with_different_model_creates_seperate_cache_record(): void
     {
         $service = app(EmbeddingCacheService::class);
 
