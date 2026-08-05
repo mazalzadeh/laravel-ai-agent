@@ -30,7 +30,7 @@ class LlmClient
         }
 
         // Scenario 2: Tool output is provided -> LLM provides final human-like answer
-        if($lastMessage['role']==='tool'){
+        if ($lastMessage['role'] === 'tool') {
             return $this->simulateFinalResponse($messages);
         }
 
@@ -44,30 +44,30 @@ class LlmClient
      * @param string $userPrompt
      * @return array
      */
-    protected function simulateToolCallResponse(string $userPrompt):array
+    protected function simulateToolCallResponse(string $userPrompt): array
     {
         // Extracting Order ID (e.g., ORD-2024) using Regex
-        preg_match('/ORD-\d+/',$userPrompt,$matches);
-        $orderId=$matches[0]?? 'ORD-12345';
+        preg_match('/ORD-\d+/', $userPrompt, $matches);
+        $orderId = $matches[0] ?? 'ORD-12345';
 
-        return[
-            'choices'=>[
+        return [
+            'choices' => [
                 [
-                    'message'=>[
-                        'role'=>'assistant',
-                        'content'=>null,
-                        'tool_calls'=>[
+                    'message' => [
+                        'role' => 'assistant',
+                        'content' => null,
+                        'tool_calls' => [
                             [
-                                'id'=>'call_'. Str::random(10),
-                                'type'=>'function',
-                                'function'=>[
-                                    'name'=>'get_order_status',
-                                    'arguments'=>json_encode('order_id'=>$orderId)
+                                'id' => 'call_' . Str::random(10),
+                                'type' => 'function',
+                                'function' => [
+                                    'name' => 'get_order_status',
+                                    'arguments' => json_encode(['order_id' => $orderId])
                                 ]
                             ]
                         ]
                     ],
-                    'finish_reason'=>'tool_calls'
+                    'finish_reason' => 'tool_calls'
                 ]
             ]
         ];
@@ -79,19 +79,66 @@ class LlmClient
      * @param array $messages
      * @return array
      */
-    protected function simulateFinalResponse(array $messages):array
+    protected function simulateFinalResponse(array $messages): array
     {
-        // Find the tool response in history
-        $toolMessage=collect($messages)->where('role','tool')->last();
-        $data=json_decode($toolMessage['content'],true);
+        $toolMessage = $messages[array_key_last($messages)];
 
-        $status=$data['status']??'نامشخص';
-        $delivery=$data['delivery_date']??'نامعلوم';
+        $toolResult = json_decode($toolMessage['content'] ?? '{}', true);
 
-        $responseText = "با توجه به استعلام من، سفارش شما در وضعیت «{$status}» قرار دارد. " .
-                        "تاریخ تقریبی تحویل این مرسوله {$delivery} و توسط شرکت {$data['courier']} ارسال شده است.";
+        if (!is_array($toolResult)) {
+            return [
+                'choices' => [
+                    [
+                        'message' => [
+                            'role' => 'assistant',
+                            'content' => 'متأسفم، نتیجهٔ ابزار قابل پردازش نیست.',
 
-        return $this->defaultResponse($responseText);
+                        ]
+                    ]
+                ]
+            ];
+        }
+
+        if (($toolResult['success'] ?? true) === false) {
+            $errorType = $toolResult['error']['type'] ?? 'unknown_error';
+
+            $errorMessage = $toolResult['error']['message'] ?? 'خطایی نامشخص هنگام اجرای ابزار رخ داد.';
+
+            return [
+                'choices' => [
+                    [
+                        'message' => [
+                            'role' => 'assistant',
+                            'content' => sprintf(
+                                'متأسفم، اجرای ابزار با خطا مواجه شد (%s): %s',
+                                $errorType,
+                                $errorMessage
+                            ),
+                        ]
+                    ]
+                ]
+            ];
+        }
+
+        return [
+            'choices' => [
+                [
+                    'message' => [
+                        'role' => 'assistant',
+                        'content' => sprintf(
+                            'وضعیت سفارش %s: %s. شرکت حمل: %s، شماره رهگیری: %s، '
+                                . 'زمان تقریبی تحویل: %s، وضعیت پرداخت: %s.',
+                            $toolResult['order_id'],
+                            $toolResult['status'],
+                            $toolResult['carrier'],
+                            $toolResult['tracking_number'],
+                            $toolResult['estimated_delivery'],
+                            $toolResult['payment_status'],
+                        ),
+                    ],
+                ],
+            ],
+        ];
     }
 
     /**
@@ -100,16 +147,16 @@ class LlmClient
      * @param string $content
      * @return array
      */
-    protected function defaultResponse(string $content):array
+    protected function defaultResponse(string $content): array
     {
-        return[
-            'choices'=>[
+        return [
+            'choices' => [
                 [
-                    'message'=>[
-                        'role'=>'assistant',
-                        'content'=>$content,
+                    'message' => [
+                        'role' => 'assistant',
+                        'content' => $content,
                     ],
-                    'finish_reason'=>'stop'
+                    'finish_reason' => 'stop'
                 ]
             ]
         ];

@@ -3,6 +3,7 @@
 namespace App\AI\Tools;
 
 use InvalidArgumentException;
+use Illuminate\Support\Facades\Validator;
 
 /**
  * Represent a tool that retrieves order status information for a customer.
@@ -62,20 +63,38 @@ class GetOrderStatusTool implements ToolInterface
      */
     public function execute(array $arguments): array
     {
-        if (empty($arguments['order_id'])) {
-            throw new InvalidArgumentException("The 'order_id' parameter is required.");
-        }
-
-        $orderId = $arguments['order)id'];
+        $validated = $this->validateArguments($arguments);
 
         //Simulating a database response or order service
         return [
-            'order_id' => $orderId,
+            'order_id' => $validated['order_id'],
             'status' => 'shipped',
             'carrier' => 'Post Iran',
             'tracking_number' => 'IR9876543210',
-            'estimate_delivery' => '2026-08-02',
+            'estimated_delivery' => '2026-08-02',
             'payment_status' => 'paid',
         ];
+    }
+
+
+    private function validateArguments(array $arguments):array
+    {
+        $validated=Validator::make(
+            data:$arguments,
+            rules:[
+                'order_id'=>[
+                    'required',
+                    'string',
+                    'regex:/^ORD-\d+$/'
+                ],
+            ],
+            messages:[
+                'order_id.required'=>'The order_id argument is required.',
+                'order_id.string'=>'The order_id argument must be a string.',
+                'order_id.regex'=>'The order_id must match the ORD-1234 format.'
+            ],
+        )->validate();
+
+        return $validated;
     }
 }
