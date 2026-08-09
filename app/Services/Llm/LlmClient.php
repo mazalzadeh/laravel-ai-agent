@@ -2,6 +2,7 @@
 
 namespace App\Services\Llm;
 
+use App\Services\Llm\Contracts\LlmClient as LlmClientContract;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -11,7 +12,7 @@ use Illuminate\Support\Str;
  * Provides a fake implementation of an LLM client for local development
  * and testing of Function Calling infrastructure in Laravel 12.
  */
-class LlmClient
+class LlmClient implements LlmClientContract
 {
     /**
      * Sends messages to the fake LLM and returns a simulated OpenAI-style response.
@@ -68,10 +69,12 @@ class LlmClient
                         ]
                     ],
                     'finish_reason' => 'tool_calls'
-                ]
-            ]
+                ],
+            ],
+            'usage' => $this->fakeUsage(),
         ];
     }
+
 
     /**
      * Simulates the final textual response after receiving tool results.
@@ -95,7 +98,8 @@ class LlmClient
 
                         ]
                     ]
-                ]
+                ],
+                'usage' => $this->fakeUsage(),
             ];
         }
 
@@ -116,7 +120,8 @@ class LlmClient
                             ),
                         ]
                     ]
-                ]
+                ],
+                'usage' => $this->fakeUsage(),
             ];
         }
 
@@ -138,8 +143,10 @@ class LlmClient
                     ],
                 ],
             ],
+            'usage' => $this->fakeUsage(),
         ];
     }
+
 
     /**
      * Generates a standard OpenAI-style message structure.
@@ -158,7 +165,44 @@ class LlmClient
                     ],
                     'finish_reason' => 'stop'
                 ]
+            ],
+            'usage' => $this->fakeUsage(),
+        ];
+    }
+
+
+    /**
+     * Sends a prompt to the fake LLM and returns a simulated response.
+     *
+     * @param string $prompt The prompt sent to the fake LLM.
+     * @return array<string, mixed> Simulated response from the LLM.
+     */
+    public function requestCompletion(string $prompt): array
+    {
+        return $this->chat([
+            [
+                'role' => 'user',
+                'content' => $prompt,
             ]
+        ]);
+    }
+
+
+    /**
+     * Returns deterministic token usage for fake LLM responses.
+     *
+     * @return array{
+     *     prompt_tokens: int,
+     *     completion_tokens: int,
+     *     total_tokens: int
+     * }
+     */
+    protected function fakeUsage(): array
+    {
+        return [
+            'prompt_tokens' => 10,
+            'completion_tokens' => 20,
+            'total_tokens' => 30,
         ];
     }
 }
