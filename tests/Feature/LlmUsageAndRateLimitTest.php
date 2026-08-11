@@ -10,6 +10,7 @@ use App\Services\Llm\LlmClient;
 use App\Services\Llm\LlmRateLimiter;
 use App\Services\Llm\MeteredLlmClient;
 use App\Services\Llm\TokenUsageCalculator;
+use App\Services\Llm\TokenUsageRecorder;
 use App\Services\Llm\UsageProvider;
 use Tests\TestCase;
 
@@ -31,11 +32,13 @@ class LlmUsageAndRateLimitTest extends TestCase
         $rateLimiter = new LlmRateLimiter($usageProvider);
         $calculator = new TokenUsageCalculator();
         $client = new LlmClient();
+        $recorder = new TokenUsageRecorder();
 
         $meteredClient = new MeteredLlmClient(
             $rateLimiter,
             $calculator,
-            $client
+            $client,
+            $recorder,
         );
 
         $response = $meteredClient->requestCompletion('وضعیت سفارش ORD-2024 چیست؟');
@@ -64,12 +67,14 @@ class LlmUsageAndRateLimitTest extends TestCase
         $rateLimiter = new LlmRateLimiter($usageProvider);
         $calculator = new TokenUsageCalculator();
         $client = new LlmClient();
+        $recorder = new TokenUsageRecorder();
 
 
         $meteredClient = new MeteredLlmClient(
             $rateLimiter,
             $calculator,
-            $client
+            $client,
+            $recorder,
         );
 
         $this->expectException(LlmRateLimitExceededException::class);
