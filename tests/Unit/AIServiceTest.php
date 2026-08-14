@@ -3,17 +3,15 @@
 namespace Tests\Unit;
 
 use App\DTO\ChatResponseDTO;
-//use PHPUnit\Framework\TestCase;
 use Tests\TestCase;
 use Tests\Unit;
 use App\Services\AIService;
 use App\Services\AIClientInterface;
 use Generator;
-use GrahamCampbell\ResultType\Success;
-use Illuminate\Support\Facades\Http;
 use Mockery;
-use PhpParser\Node\Expr\FuncCall;
 use RuntimeException;
+use App\AI\Prompts\Templates\DocumentAnalysisPrompt;
+use App\AI\Prompts\PromptRenderer;
 
 class AIServiceTest extends TestCase
 {
@@ -540,5 +538,59 @@ class AIServiceTest extends TestCase
         $this->expectExceptionMessage('AI failed to return a valid JSON string.');
 
         $service->structured('Analyze this broken input', $schema);
+    }
+
+
+    public function test_execute_prompt_renders_and_executes_a_structured_template(): void
+    {
+        $document = 'The payment gateway returned an error for transaction #1234.';
+
+
+        $expectedResponse =
+            [
+                'summary' => 'A payment gateway error occurred for transaction #1234.',
+                'category' => 'payment',
+            ];
+
+        $client = $this->createMock(AIClientInterface::class);
+
+        $client->expects($this->once())
+            ->method('chat')
+            ->with(
+                $this->callback(function (array $messages) use ($document): bool {
+                    $systemMessage = $messages[0]['content'] ?? '';
+                    $userMessage = $messages[1]['content'] ?? '';
+
+                    return str_contains($systemMessage, 'expert document analyst')
+                        && str_contains($userMessage, $document);
+                }),
+                $this->callback(function (array $options): bool {
+                    return ($options['response_format']['type'] ?? null) === 'json_schema'
+                        && ($options['temperature'] ?? null) === 0;
+                })
+            )->willReturn(
+                [
+                    'success' => true,
+                    'data' => [
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => json_encode($expectedResponse),
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            );
+
+        $service = new AIService($client, new PromptRenderer());
+
+        $result = $service->executePrompt(
+            new DocumentAnalysisPrompt(),
+            ['document' => $document]
+        );
+
+        $this->assertSame($expectedResponse, $result);
     }
 }

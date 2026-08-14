@@ -8,10 +8,15 @@ use App\DTO\OpenAIErrorDTO;
 use Generator;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use App\AI\Prompts\Contracts\PromptTemplate;
+use App\AI\Prompts\PromptRenderer;
 
 class AIService
 {
     protected AIClientInterface $client;
+    protected PromptRenderer $promptRenderer;
+
+
     /**
      * Create a new AI service instance with the given AI client implementation.
      *
@@ -19,10 +24,15 @@ class AIService
      * embedding operations through a shared interface abstraction.
      *
      * @param AIClientInterface $client The AI client implementation used by the service.
+     * @param PromptRenderer|null $promptRenderer The renderer used to resolve dynamic prompt variables.
      */
-    public function __construct(AIClientInterface $client)
+    public function __construct(
+        AIClientInterface $client,
+        ?PromptRenderer $promptRenderer=null
+        )
     {
         $this->client = $client;
+        $this->promptRenderer=$promptRenderer??new PromptRenderer();
     }
 
     /**
@@ -150,7 +160,7 @@ class AIService
      * @throws \RuntimeException If all retry attempts exhaust without generating a valid schema-compliant response.
      * @return array The decoded associative array matching the specified schema.
      */
-    public function structured(string $prompt, array $schema): array
+    /*public function structured(string $prompt, array $schema): array
     {
         $system = "You must return ONLY valid JSON matching this schema:\n"
             . json_encode($schema, JSON_PRETTY_PRINT);
@@ -217,5 +227,132 @@ class AIService
             }
         }
         throw new RuntimeException('AI failed to return a valid structured response.');
+    }*/
+
+
+    /**
+     * Execute a structured response request enforcing strict compliance with a given JSON schema.
+     *
+     * @param string $prompt The user prompt instructions.
+     * @param array<string, mixed> $schema The JSON Schema array specifying the required keys and types.
+     *
+     * @throws RuntimeException If all retry attempts exhaust without generating a valid schema-compliant response.
+     * @return array<string, mixed> The decoded associative array matching the specified schema.
+     */
+    public function structured(string $prompt, array $schema): array
+    {
+        $system = "You must return ONLY valid JSON matching this schema:\n"
+            . json_encode($schema, JSON_PRETTY_PRINT);
+
+        return $this->structuredWithMessages([
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $prompt],
+        ], $schema);
+    }
+
+
+    /**
+     * Execute a structured request using pre-built chat messages.
+     *
+     * Attempts native JSON Schema output first. If the native response cannot be
+     * decoded or fails schema validation, it falls back to a maximum of three
+     * self-correction attempts while preserving the supplied message context.
+     *
+     * @param array<int, array{role: string, content: string}> $messages Chat messages to send to the AI model.
+     * @param array<string, mixed> $schema The JSON Schema array specifying the required structure.
+     *
+     * @throws RuntimeException If all retry attempts exhaust without generating a valid schema-compliant response.
+     * @return array<string, mixed> The decoded associative array matching the specified schema.
+     */
+    private function structuredWithMessages(array $messages, array $schema): array
+    {
+        $maxAttempts = 3;
+
+        $nativeOptions = [
+            'response_format' => [
+                'type' => 'json_schema',
+                'json_schema' => [
+                    'name' => 'structured_response',
+                    'schema' => $schema,
+                ],
+            ],
+            'temperature' => 0,
+        ];
+
+        try {
+            $response = $this->chat($messages, $nativeOptions);
+
+            $data = json_decode($response, true);
+
+            if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
+                StructuredResponseValidator::validate($data, $schema);
+
+                return $data;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Native structured output failed, falling back to retry-based flow.', [
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $response = $this->chat($messages);
+
+            try {
+                $data = json_decode($response, true);
+
+                if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+                    throw new RuntimeException('AI failed to return a valid JSON string.');
+                }
+
+                StructuredResponseValidator::validate($data, $schema);
+
+                return $data;
+            } catch (RuntimeException $exception) {
+                if ($attempt === $maxAttempts) {
+                    throw $exception;
+                }
+
+                $messages[] = [
+                    'role' => 'assistant',
+                    'content' => $response,
+                ];
+
+                $messages[] = [
+                    'role' => 'user',
+                    'content' => 'Your previous response was invalid. '
+                        . $exception->getMessage()
+                        . ' Return only the corrected JSON.',
+                ];
+            }
+        }
+
+        throw new RuntimeException('AI failed to return a valid structured response.');
+    }
+
+
+    /**
+     * Execute a dynamic prompt template with the supplied runtime variables.
+     *
+     * The template is rendered into concrete system and user messages. Prompts that
+     * define a JSON schema are executed through the existing structured response
+     * flow; prompts without a schema are executed as standard chat requests.
+     *
+     * @param PromptTemplate $prompt The prompt template to execute.
+     * @param array<string, mixed> $variables Values used to replace prompt placeholders.
+     *
+     * @return array<string, mixed>|string A structured array or a plain text response.
+     */
+    public function executePrompt(PromptTemplate $prompt, array $variables = []): array|string
+    {
+        $messages = $this->promptRenderer->render($prompt, $variables);
+
+        $schema = $prompt->getSchema();
+
+        if ($schema !== null) {
+            return $this->structuredWithMessages($messages,$schema);
+        }
+
+        return $this->chat($messages);
     }
 }
