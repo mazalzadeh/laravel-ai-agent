@@ -15,7 +15,7 @@ use App\Services\EmbeddingCacheService;
 use App\Services\VectorSimilarityService;
 use App\AI\Context\VectorContextRetriever;
 use App\Models\DocumentChunk;
-use Dom\Document;
+use App\Models\Document;
 
 final class VectorContextRetrieverTest extends TestCase
 {
@@ -41,11 +41,11 @@ final class VectorContextRetrieverTest extends TestCase
 
         $embeddingCache = Mockery::mock(EmbeddingCacheService::class);
         $embeddingCache
-            ->shouldReceive('getOrCreate')
+            ->shouldReceive('remember')
             ->once()
             ->with($query, Mockery::type('callable'))
             ->andReturnUsing(
-                static function (string $key, callable $callback) use ($embedding): array {
+                static function (string $key, callable $callback): array {
                     return $callback();
                 }
             );
@@ -63,24 +63,28 @@ final class VectorContextRetrieverTest extends TestCase
 
     private function makeDocument(): Document
     {
-        return new Document([
-            'id' => 10,
-            'title' => 'Laravel Guide',
-            'source' => 'docs/laravel.md',
-        ]);
+        $document=new Document();
+
+        $document->setAttribute('id',10);
+        $document->setAttribute('title','Laravel Guide');
+        $document->setAttribute('source','docs/laravel.md');
+
+        return $document;
     }
 
 
     private function makeChunk(): DocumentChunk
     {
-        return new DocumentChunk(
-            [
-                'id' => 25,
-                'document_id' => 10,
-                'chunk_index' => 2,
-                'content' => 'Laravel is a PHP framework for building web applications',
-            ]
+        $chunk = new DocumentChunk();
+
+        $chunk->setAttribute('id', 25);
+        $chunk->setAttribute('chunk_index', 2);
+        $chunk->setAttribute(
+            'content',
+            'Laravel is a PHP framework for building web applications.',
         );
+
+        return $chunk;
     }
 
 
@@ -112,7 +116,7 @@ final class VectorContextRetrieverTest extends TestCase
         $this->assertArrayHasKey('document_title', $retrievedDocument->metadata);
         $this->assertArrayHasKey('document_source', $retrievedDocument->metadata);
         $this->assertSame('Laravel Guide', $retrievedDocument->metadata['document_title']);
-        $this->assertSame('docs.laravel.md', $retrievedDocument->metadata['document_source']);
+        $this->assertSame('docs/laravel.md', $retrievedDocument->metadata['document_source']);
         $this->assertCount(2, $retrievedDocument->metadata);
     }
 
@@ -171,8 +175,8 @@ final class VectorContextRetrieverTest extends TestCase
             ->andReturn(collect());
 
         $retriever = new VectorContextRetriever(
-            $embeddingCache,
             $aiService,
+            $embeddingCache,
             $vectorSimilarity,
         );
 
@@ -215,8 +219,116 @@ final class VectorContextRetrieverTest extends TestCase
     }
 
 
-    public function test_it_returns_an_empty_collection_when_similarity_returns_no_results(): void {}
+    public function test_it_returns_an_empty_collection_when_similarity_returns_no_results(): void
+    {
+        $aiService = Mockery::mock(AIService::class);
+        $embeddingCache = Mockery::mock(EmbeddingCacheService::class);
+        $vectorSimilarity = Mockery::mock(VectorSimilarityService::class);
+
+        $query = 'laravel context';
+        $embedding = [0.1, 0.2, 0.3];
+
+        $aiService
+            ->shouldReceive('embed')
+            ->once()
+            ->with($query)
+            ->andReturn($embedding);
+
+        $embeddingCache
+            ->shouldReceive('remember')
+            ->once()
+            ->with($query, Mockery::type(\Closure::class))
+            ->andReturnUsing(
+                function (string $query, \Closure $callback): array {
+                    return $callback();
+                },
+            );
+
+        $vectorSimilarity
+            ->shouldReceive('findMostSimilar')
+            ->once()
+            ->with($embedding, 5)
+            ->andReturn([]);
+
+        $retriever = new VectorContextRetriever(
+            $aiService,
+            $embeddingCache,
+            $vectorSimilarity,
+        );
+
+        $result = $retriever->retrieve($query);
+
+        $this->assertInstanceOf(Collection::class, $result);
+        $this->assertCount(0, $result);
+        $this->assertSame([], $result->all());
+    }
 
 
-    public function test_it_preserves_the_order_of_similarity_results(): void {}
+    public function test_it_preserves_the_order_of_similarity_results(): void
+    {
+        $firstDocument = new Document();
+        $firstDocument->id = 10;
+
+        $firstChunk = new DocumentChunk();
+        $secondDocument = new Document();
+        $secondDocument->id = 11;
+
+        $secondChunk = new DocumentChunk();
+
+        $firstResult = [
+            'document' => $firstDocument,
+            'chunk' => $firstChunk,
+            'score' => 0.91,
+        ];
+
+        $secondResult = [
+            'document' => $secondDocument,
+            'chunk' => $secondChunk,
+            'score' => 0.78,
+        ];
+
+        $aiService = Mockery::mock(AIService::class);
+        $embeddingCacheService = Mockery::mock(EmbeddingCacheService::class);
+        $vectorSimilarityService = Mockery::mock(VectorSimilarityService::class);
+
+        $embeddingCacheService
+            ->shouldReceive('remember')
+            ->once()
+            ->andReturnUsing(static function (string $key, callable $callback): mixed {
+                return $callback();
+            });
+
+        $aiService
+            ->shouldReceive('embed')
+            ->once()
+            ->with('ordered query')
+            ->andReturn([0.1, 0.2, 0.3]);
+
+        $vectorSimilarityService
+            ->shouldReceive('findMostSimilar')
+            ->once()
+            ->with([0.1, 0.2, 0.3], 5)
+            ->andReturn(new Collection([$firstResult, $secondResult]));
+
+        $retriever = new VectorContextRetriever(
+            $aiService,
+            $embeddingCacheService,
+            $vectorSimilarityService,
+        );
+
+        $results = $retriever->retrieve('ordered query');
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(2, $results);
+
+        $first = $results->first();
+        $second = $results->last();
+
+        $this->assertInstanceOf(RetrievedDocument::class, $first);
+        $this->assertInstanceOf(RetrievedDocument::class, $second);
+        $this->assertSame(10, $first->documentId);
+        $this->assertSame(0.91, $first->score);
+        $this->assertSame(11, $second->documentId);
+        $this->assertSame(0.78, $second->score);
+    }
 }
