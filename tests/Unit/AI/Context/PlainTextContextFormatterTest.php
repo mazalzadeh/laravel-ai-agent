@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\AI\Context;
 
+use App\AI\Context\ContextFormatter;
 use App\AI\Context\PlainTextContextFormatter;
 use App\AI\Context\RetrievedDocument;
 use Illuminate\Support\Collection;
@@ -151,5 +152,13 @@ final class PlainTextContextFormatterTest extends TestCase
         $this->assertStringNotContainsString('0.99', $result);
         $this->assertStringNotContainsString('INternal title', $result);
         $this->assertStringNotContainsString('internal-source', $result);
+    }
+
+
+    public function test_it_implements_context_formatter_interface(): void
+    {
+        $formatter = new PlainTextContextFormatter();
+
+        $this->assertInstanceOf(ContextFormatter::class, $formatter);
     }
 }
