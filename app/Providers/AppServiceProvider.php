@@ -8,6 +8,10 @@ use App\Services\FakeOpenAIClient;
 use App\Services\OpenAIClient;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Log;
+use App\AI\Context\ContextFormatter;
+use App\AI\Context\PlainTextContextFormatter;
+use App\AI\Context\ContextRetriever;
+use App\AI\Context\VectorContextRetriever;
 
 
 class AppServiceProvider extends ServiceProvider
@@ -31,7 +35,10 @@ class AppServiceProvider extends ServiceProvider
             Log::info('Binding OpenAIClient');
             return new OpenAIClient();
         });
-    
+
+        $this->app->bind(ContextFormatter::class, PlainTextContextFormatter::class);
+        $this->app->bind(ContextRetriever::class, VectorContextRetriever::class);
+
     }
 
     /**
