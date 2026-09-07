@@ -57,7 +57,7 @@ final class RagServiceTest extends TestCase
     {
         $question = 'What is Laravel?';
 
-         $retrievedDoc = new RetrievedDocument(
+        $retrievedDoc = new RetrievedDocument(
             documentId: 1,
             chunkId: 10,
             chunkIndex: 0,
@@ -82,12 +82,12 @@ final class RagServiceTest extends TestCase
             ->shouldReceive('chat')
             ->once()
             ->with($expectedMessages)
-            ->andReturn(['content' => 'Laravel is a PHP framework.']);
+            ->andReturn('Laravel is a PHP framework.');
 
         $result = $this->ragService->answer($question, 5);
 
         $this->assertSame($question, $result['question']);
-        $this->assertSame(['content' => 'Laravel is a PHP framework.'], $result['answer']);
+        $this->assertSame('Laravel is a PHP framework.', $result['answer']);
         $this->assertCount(1, $result['sources']);
         $this->assertSame(1, $result['sources'][0]['document_id']);
         $this->assertSame(10, $result['sources'][0]['chunk_id']);
@@ -115,7 +115,7 @@ final class RagServiceTest extends TestCase
             ->shouldReceive('chat')
             ->once()
             ->with($expectedMessages)
-            ->andReturn(['content' => 'Quantum computing is...']);
+            ->andReturn('I could not find information about quantum physics.');
 
         $result = $this->ragService->answer($question, 3);
 
