@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\AI\Prompts\ContextAwarePromptExecutor;
 use App\AI\Context\ContextInjectionService;
 use App\AI\Context\RetrievedDocument;
 use App\AI\Prompts\PromptRenderer;
@@ -13,18 +14,18 @@ use App\Services\AIService;
 
 class RagService
 {
-    /**
+   /**
      * Create a new RAG service instance.
      *
      * @param AIService $aiService
      * @param ContextInjectionService $contextService
-     * @param PromptRenderer $promptRenderer
+     * @param ContextAwarePromptExecutor $executor
      * @param RagPrompt $ragPrompt
      */
     public function __construct(
         protected AIService $aiservice,
         protected ContextInjectionService $contextService,
-        protected PromptRenderer $promptRenderer,
+        protected ContextAwarePromptExecutor $executor,
         protected RagPrompt $ragPrompt
     ){}
 
@@ -42,21 +43,15 @@ class RagService
         // 1. Retrieve and format context using ContextInjectionService
         $retrievedContext = $this->contextService->inject($question, $limit);
 
-        // 2. Determine context content with fallback for empty results
-        $contextContent = $retrievedContext->isEmpty()
-            ? 'No relevant context found.'
-            : $retrievedContext->content;
+       // 2. Execute prompt with dynamic context and fallback via ContextAwarePromptExecutor
+        $result=$this->executor->execute(
+            prompt:$this->ragPrompt,
+            context:$retrievedContext->content,
+            query:$question,
+            fallbackContext:'No relevant context found.'
+        );
 
-        // 3. Render dynamic prompt messages
-        $messages = $this->promptRenderer->render($this->ragPrompt, [
-            'context' => $contextContent,
-            'question' => $question,
-        ]);
-
-        // 3. Call AI service
-        $answer = $this->aiservice->chat($messages);
-
-        // 4. Map retrieved documents to sources array
+        // 3. Map retrieved documents to sources array
         $sources = $retrievedContext->documents
             ->map(fn(RetrievedDocument $doc) => [
                 'document_id' => $doc->documentId,
@@ -68,7 +63,7 @@ class RagService
 
         return [
             'question' => $question,
-            'answer' => $answer,
+            'answer' => $result->content,
             'sources' => $sources,
         ];
     }

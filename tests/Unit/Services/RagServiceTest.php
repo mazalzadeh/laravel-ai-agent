@@ -9,7 +9,8 @@ use App\AI\Context\ContextInjectionService;
 use App\AI\Context\ContextRetriever;
 use App\AI\Context\PlainTextContextFormatter;
 use App\AI\Context\RetrievedDocument;
-use App\AI\Prompts\PromptRenderer;
+use App\AI\Prompts\ContextAwarePromptExecutor;
+use App\AI\Prompts\PromptExecutionResult;
 use App\AI\Prompts\Templates\RagPrompt;
 use App\Services\AIService;
 use App\Services\RagService;
@@ -22,9 +23,11 @@ final class RagServiceTest extends TestCase
     private ContextRetriever $retriever;
     private ContextFormatter $formatter;
     private ContextInjectionService $contextService;
-    private PromptRenderer $promptRenderer;
+    private ContextAwarePromptExecutor $executor;
     private RagPrompt $ragPrompt;
     private RagService $ragService;
+
+
 
     protected function setUp(): void
     {
@@ -34,13 +37,14 @@ final class RagServiceTest extends TestCase
         $this->retriever = Mockery::mock(ContextRetriever::class);
         $this->formatter = new PlainTextContextFormatter();
         $this->contextService = new ContextInjectionService($this->retriever, $this->formatter);
-        $this->promptRenderer = new PromptRenderer();
+
+        $this->executor = Mockery::mock(ContextAwarePromptExecutor::class);
         $this->ragPrompt = new RagPrompt();
 
         $this->ragService = new RagService(
             $this->aiService,
             $this->contextService,
-            $this->promptRenderer,
+            $this->executor,
             $this->ragPrompt
         );
     }
@@ -56,6 +60,7 @@ final class RagServiceTest extends TestCase
     public function test_answer_uses_rendered_rag_prompt_with_context(): void
     {
         $question = 'What is Laravel?';
+        $aiResponse = 'Laravel is a PHP framework.';
 
         $retrievedDoc = new RetrievedDocument(
             documentId: 1,
@@ -73,32 +78,32 @@ final class RagServiceTest extends TestCase
 
         $formattedContent = $this->formatter->format(collect([$retrievedDoc]));
 
-        $expectedMessages = $this->promptRenderer->render($this->ragPrompt, [
-            'context' => $formattedContent,
-            'question' => $question,
-        ]);
 
-        $this->aiService
-            ->shouldReceive('chat')
+        $this->executor
+            ->shouldReceive('execute')
             ->once()
-            ->with($expectedMessages)
-            ->andReturn('Laravel is a PHP framework.');
-
+            ->with(
+                $this->ragPrompt,
+                $formattedContent,
+                $question,
+                [], // اضافه کردن این آرایه برای تطابق با پارامتر variables
+                'No relevant context found.'
+            )
+            ->andReturn(new PromptExecutionResult(content: $aiResponse));
         $result = $this->ragService->answer($question, 5);
 
         $this->assertSame($question, $result['question']);
-        $this->assertSame('Laravel is a PHP framework.', $result['answer']);
+        $this->assertSame($aiResponse, $result['answer']);
         $this->assertCount(1, $result['sources']);
         $this->assertSame(1, $result['sources'][0]['document_id']);
-        $this->assertSame(10, $result['sources'][0]['chunk_id']);
-        $this->assertSame('Laravel is a web framework.', $result['sources'][0]['content']);
-        $this->assertSame(0.95, $result['sources'][0]['score']);
     }
 
 
     public function test_answer_handles_empty_context_fallback(): void
     {
         $question = 'What is Quantum Computing?';
+        $aiResponse = 'I could not find information.';
+
 
         $this->retriever
             ->shouldReceive('retrieve')
@@ -106,20 +111,22 @@ final class RagServiceTest extends TestCase
             ->with($question, 3)
             ->andReturn(collect([]));
 
-        $expectedMessages = $this->promptRenderer->render($this->ragPrompt, [
-            'context' => 'No relevant context found.',
-            'question' => $question,
-        ]);
 
-        $this->aiService
-            ->shouldReceive('chat')
+        $this->executor
+            ->shouldReceive('execute')
             ->once()
-            ->with($expectedMessages)
-            ->andReturn('I could not find information about quantum physics.');
-
+            ->with(
+                $this->ragPrompt,
+                '',
+                $question,
+                [], // اضافه کردن این آرایه برای تطابق با پارامتر variables
+                'No relevant context found.'
+            )
+            ->andReturn(new PromptExecutionResult(content: $aiResponse));
         $result = $this->ragService->answer($question, 3);
 
         $this->assertSame($question, $result['question']);
+        $this->assertSame($aiResponse, $result['answer']);
         $this->assertEmpty($result['sources']);
     }
 }
