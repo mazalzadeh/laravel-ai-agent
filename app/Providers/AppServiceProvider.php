@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use App\Services\AIClientInterface;
-use App\Services\FakeAIClient;
 use App\Services\FakeOpenAIClient;
 use App\Services\OpenAIClient;
 use Illuminate\Support\ServiceProvider;
@@ -17,15 +16,30 @@ use App\AI\Context\VectorContextRetriever;
 class AppServiceProvider extends ServiceProvider
 {
     /**
+     * All of the container bindings that should be registered.
+     *
+     * @var array<string, string>
+     */
+    public array $bindings = [
+        ContextFormatter::class => PlainTextContextFormatter::class,
+        ContextRetriever::class => VectorContextRetriever::class,
+    ];
+
+
+    /**
      * Register any application services.
      */
     public function register(): void
     {
-            Log::info('OPENAI_MOCK env: ' . var_export(env('OPENAI_MOCK'), true));
-            Log::info('config(app.openai_mock): ' . var_export(config('app.openai_mock'), true));
 
+        $this->app->bind(AIClientInterface::class, function () {
+            $isMock = config('services.openai.mock', true);
 
-        $this->app->bind(AIClientInterface::class, function(){
+            return $isMock
+                ? new FakeOpenAIClient()
+                : new OpenAIClient();
+        });
+        /*$this->app->bind(AIClientInterface::class, function(){
             //if OPENAI_MOCK=true use Fake
             if(env('OPENAI_MOCK', true)){
                 Log::info('Binding FakeOpenAIClient');
@@ -34,11 +48,7 @@ class AppServiceProvider extends ServiceProvider
 
             Log::info('Binding OpenAIClient');
             return new OpenAIClient();
-        });
-
-        $this->app->bind(ContextFormatter::class, PlainTextContextFormatter::class);
-        $this->app->bind(ContextRetriever::class, VectorContextRetriever::class);
-
+        });*/
     }
 
     /**
