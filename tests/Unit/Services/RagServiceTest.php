@@ -50,7 +50,7 @@ final class RagServiceTest extends TestCase
     }
 
 
-    protected function rearDown(): void
+    protected function tearDown(): void
     {
         Mockery::close();
         parent::tearDown();
