@@ -44,8 +44,10 @@ class AIServiceEmbeddingTest extends TestCase
 
     public function test_openai_returns_real_embedding(): void
     {
-        if (!config('services.openai.key')) {
-            $this->markTestSkipped('OpenAI API key is not configured.');
+        $apiKey = config('services.openai.key');
+
+        if (! $apiKey || $apiKey === 'fake-key' || str_starts_with((string) $apiKey, 'fake')) {
+            $this->markTestSkipped('Real OpenAI API key is not configured.');
         }
 
         $this->app->bind(AIClientInterface::class, OpenAIClient::class);
