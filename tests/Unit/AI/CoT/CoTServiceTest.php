@@ -8,7 +8,7 @@ use App\AI\CoT\CoTOutputParser;
 use App\AI\CoT\CoTService;
 use App\AI\CoT\DTOs\CoTResult;
 use App\AI\CoT\Prompts\CoTPromptTemplate;
-use App\AI\Contracts\ClientInterface;
+use App\Services\AIClientInterface;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -32,7 +32,7 @@ class CoTServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->clientMock = Mockery::mock(ClientInterface::class);
+        $this->clientMock = Mockery::mock(AIClientInterface::class);
         $this->template = new CoTPromptTemplate();
         $this->parser = new CoTOutputParser();
 
@@ -61,11 +61,13 @@ class CoTServiceTest extends TestCase
         $rawModelResponse = "<thought>\n10% of 200 is 20. 5% is 10. 20 + 10 = 30.\n</thought>\n<answer>\n30\n</answer>";
 
         $this->clientMock
-            ->shouldReceive('generateText')
+            ->shouldReceive('chat')
             ->once()
-            ->with(Mockery::on(function ($prompt) use ($question) {
-                return str_contains($prompt, $question) && str_contains($prompt, '<thought>');
-            }))->andReturn($rawModelResponse);
+            ->with(Mockery::on(function (array $messages) use ($question) {
+                $userPrompt = $messages[0]['content'] ?? '';
+                return str_contains($userPrompt, $question) && str_contains($userPrompt, '<thought>');
+            }))
+            ->andReturn(['content' => $rawModelResponse]);
 
         $result = $this->service->ask($question);
 
@@ -83,11 +85,13 @@ class CoTServiceTest extends TestCase
         $rawModelResponse = "<thought>\nRefund policy specifies 14 days.\n</thought>\n<answer>\n14 days.\n</answer>";
 
         $this->clientMock
-            ->shouldReceive('generateText')
+            ->shouldReceive('chat')
             ->once()
-            ->with(Mockery::on(function ($prompt) use ($question, $context) {
-                return str_contains($prompt, $question) && str_contains($prompt, $context);
-            }))->andReturn($rawModelResponse);
+            ->with(Mockery::on(function (array $messages) use ($question, $context) {
+                $userPrompt = $messages[0]['content'] ?? '';
+                return str_contains($userPrompt, $question) && str_contains($userPrompt, $context);
+            }))
+            ->andReturn(['content' => $rawModelResponse]);
 
         $result = $this->service->askWithContext($question, $context);
 
