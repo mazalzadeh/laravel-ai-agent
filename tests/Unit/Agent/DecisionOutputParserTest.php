@@ -23,7 +23,7 @@ class DecisionOutputParserTest extends TestCase
         $rawOutput = json_encode([
             'action' => AgentAction::SEARCH_KNOWLEDGE_BASE->value,
             'parameters' => ['query' => 'German language requirements'],
-            'reasonong' => 'The user is asking about specific migration guidelines.'
+            'reasoning' => 'The user is asking about specific migration guidelines.'
         ], JSON_THROW_ON_ERROR);
 
         $result = $this->parser->parse($rawOutput);
