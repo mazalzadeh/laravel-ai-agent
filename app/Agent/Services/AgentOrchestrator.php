@@ -5,6 +5,7 @@ namespace App\Agent\Services;
 use App\Agent\DTO\DecisionResult;
 use App\Agent\Enums\AgentAction;
 use InvalidArgumentException;
+use App\Agent\Context\StepContext;
 
 class AgentOrchestrator
 {
@@ -43,5 +44,40 @@ class AgentOrchestrator
             AgentAction::DECOMPOSE_TASK->value => $this->taskDecomposeHandler->handle($userInput, $context, $decision),
             default => throw new InvalidArgumentException("Unknown action: {$decision->action}"),
         };
+    }
+
+    /**
+     * Run the orchestration pipeline and record a step-by-step trace.
+     *
+     * @param string $userInput
+     * @param StepContext $stepContext
+     * @param string|null $context
+     * @return string
+     */
+    public function runWithStepContext(string $userInput, StepContext $stepContext = null): string
+    {
+        $decision = $this->decisionService->decide($userInput, $context);
+
+        $stepContext->addStep(
+            name: 'decision',
+            input: $userInput,
+            output: $decision->action,
+            decision: $decision->toArray()
+        );
+
+        $final = match ($decision->action) {
+            AgentAction::DIRECT_ANSWER->value => $this->directAnswerHandler->handle($userInput, $context, $decision),
+            AgentAction::SEARCH_KNOWLEDGE_BASE->value => $this->knowledgeBaseHandler->handle($userInput, $context, $decision),
+            AgentAction::DECOMPOSE_TASK->value => $this->taskDecomposeHandler->handle($userInput, $context, $decision),
+            default => throw new InvalidArgumentException("Unknown action: {$decision->action}"),
+        };
+
+        $stepContext->addStep(
+            name: 'final_answer',
+            input: $userInput,
+            output: $final
+        );
+
+        return $final;
     }
 }
