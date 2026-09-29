@@ -36,7 +36,7 @@ class AgentOrchestratorStepContextTest extends TestCase
 
         $result = $orchestrator->runWithStepContext('hello', $ctx);
 
-        $this->assertSame('FINAL', $resul);
+        $this->assertSame('FINAL', $result);
 
         $data = $ctx->toArray();
         $this->assertCount(2, $data['steps']);
