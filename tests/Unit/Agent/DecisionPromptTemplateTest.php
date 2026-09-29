@@ -51,4 +51,30 @@ class DecisionPromptTemplateTest extends TestCase
         $this->assertStringContainsString($userInput, $userPrompt);
         $this->assertStringNotContainsString('context:', $userPrompt);
     }
+
+
+    public function test_it_includes_step_history_in_prompt_when_provided(): void
+    {
+        $template = new DecisionPromptTemplate();
+        $history = "[Step 1] decision\nInput: hello\nOutput: DIRECT_ANSWER";
+
+        $prompt = $template->renderUserPrompt(
+            userInput: 'What is next?',
+            context: 'Some context',
+            stepHistory: $history
+        );
+
+        $this->assertStringContainsString('Previous Steps History:', $prompt);
+        $this->assertStringContainsString($history, $prompt);
+    }
+
+
+    public function test_it_omits_step_history_section_when_empty_or_null(): void
+    {
+        $template = new DecisionPromptTemplate();
+
+        $prompt = $template->renderUserPrompt(userInput: 'What is next?');
+
+        $this->assertStringNotContainsString('Previous Steps History:', $prompt);
+    }
 }

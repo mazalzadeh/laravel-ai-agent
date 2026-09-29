@@ -28,11 +28,14 @@ class DecisionService
      * @param string|null $context Optional context for the decision.
      * @return DecisionResult
      */
-    public function decide(string $userInput, ?string $context = null): DecisionResult
-    {
+    public function decide(
+        string $userInput,
+        ?string $context = null,
+        ?string $stepHistory = null
+    ): DecisionResult {
         // 1. Render prompts
         $systemPrompt = $this->promptTemplate->renderSystemPrompt();
-        $userPrompt = $this->promptTemplate->renderUserPrompt($userInput, $context);
+        $userPrompt = $this->promptTemplate->renderUserPrompt($userInput, $context, $stepHistory);
 
         // 2. Prepare chat messages
         $messages = [

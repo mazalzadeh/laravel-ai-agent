@@ -37,13 +37,18 @@ class DecisionPromptTemplate
      * @param string|null $context Optional helpful context about the current state.
      * @return string
      */
-    public function renderUserPrompt(string $userInput, ?string $context = null): string
+    public function renderUserPrompt(string $userInput, ?string $context = null, ?string $stepHistory = null): string
     {
         $prompt = "User input:{$userInput}";
 
         if ($context !== null && trim($context) !== '') {
             $prompt .= "\n\nContext: {$context}";
         }
+
+        if ($stepHistory !== null && trim($stepHistory) !== '') {
+            $prompt .= "\n\nPrevious Steps History:\n{$stepHistory}";
+        }
+
 
         return $prompt;
     }
