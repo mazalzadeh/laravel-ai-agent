@@ -49,16 +49,7 @@ class AppServiceProvider extends ServiceProvider
                 ? new FakeOpenAIClient()
                 : new OpenAIClient();
         });
-        /*$this->app->bind(AIClientInterface::class, function(){
-            //if OPENAI_MOCK=true use Fake
-            if(env('OPENAI_MOCK', true)){
-                Log::info('Binding FakeOpenAIClient');
-                return new FakeOpenAIClient();
-            }
 
-            Log::info('Binding OpenAIClient');
-            return new OpenAIClient();
-        });*/
     }
 
     /**

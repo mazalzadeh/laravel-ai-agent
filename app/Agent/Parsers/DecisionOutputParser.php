@@ -88,7 +88,7 @@ class DecisionOutputParser
     {
         return new DecisionResult(
             action: AgentAction::DIRECT_ANSWER->value,
-            parameters: ['raw_content' => $rawOutput],
+            parameters: ['text' => $rawOutput], // کلید را به text تغییر دادیم
             reasoning: 'Fallback triggered due to invalid or non-JSON output from model.'
         );
     }
