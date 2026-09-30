@@ -55,10 +55,13 @@ class DecisionService
 
 
     /**
-     * Extract string content from AI client response payload.
+     * Extract string content from an AI client response payload.
      *
-     * @param array $response
-     * @return string
+     * Supports direct content, message content, standard choices,
+     * and provider responses nested under a data key.
+     *
+     * @param array<string, mixed> $response The AI client response payload.
+     * @return string The extracted content, or an empty string when unavailable.
      */
     private function extractContent(array $response): string
     {
@@ -70,8 +73,18 @@ class DecisionService
             return $response['message']['content'];
         }
 
-        if (isset($response['choices'][0]['message']['content']) && is_string($response['choices'][0]['message']['content'])) {
+        if (
+            isset($response['choices'][0]['message']['content'])
+            && is_string($response['choices'][0]['message']['content'])
+        ) {
             return $response['choices'][0]['message']['content'];
+        }
+
+        if (
+            isset($response['data']['choices'][0]['message']['content'])
+            && is_string($response['data']['choices'][0]['message']['content'])
+        ) {
+            return $response['data']['choices'][0]['message']['content'];
         }
 
         return '';
