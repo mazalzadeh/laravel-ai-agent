@@ -56,7 +56,7 @@ class RedisConversationMemory implements ConversationMemoryInterface
         Redis::rpush($key, $payload);
 
         if($this->windowSize>0){
-            Rdis::ltrim($key,$this->windowSize,-1);
+            Redis::ltrim($key,$this->windowSize,-1);
         }
 
         // Refresh session expiration TTL

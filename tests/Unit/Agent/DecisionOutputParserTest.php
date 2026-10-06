@@ -61,7 +61,7 @@ class DecisionOutputParserTest extends TestCase
 
         $this->assertInstanceOf(DecisionResult::class, $result);
         $this->assertEquals(AgentAction::DIRECT_ANSWER->value, $result->action);
-        $this->assertEquals(['raw_content' => $rawOutput], $result->parameters);
+        $this->assertEquals(['text' => $rawOutput], $result->parameters);
         $this->assertStringContainsString('Fallback', $result->reasoning);
     }
 }
