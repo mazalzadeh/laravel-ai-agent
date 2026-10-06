@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Agent\Contracts\ConversationMemoryInterface;
+namespace App\Agent\Contracts;
 
 interface ConversationMemoryInterface
 {
