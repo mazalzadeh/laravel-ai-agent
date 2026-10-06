@@ -3,7 +3,7 @@
 namespace Tests\Unit;
 
 use Tests\TestCase;
-use App\Services\RedisConversationMemory;
+use App\Agent\Services\RedisConversationMemory;
 use Illuminate\Support\Facades\Redis;
 
 class RedisConversationMemoryTest extends TestCase
