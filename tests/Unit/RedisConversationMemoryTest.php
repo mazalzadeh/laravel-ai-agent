@@ -14,17 +14,15 @@ class RedisConversationMemoryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->memory = new RedisConversationMemory(ttl: 3600);
+        $this->memory = new RedisConversationMemory(ttl: 3600, windowSize: 10);
         $this->memory->clear($this->sessionId);
     }
-
 
     protected function tearDown(): void
     {
         $this->memory->clear($this->sessionId);
         parent::tearDown();
     }
-
 
     public function test_can_add_and_retrieve_messages(): void
     {
@@ -40,11 +38,12 @@ class RedisConversationMemoryTest extends TestCase
         ], $messages);
     }
 
-
     public function test_can_clear_session_memory(): void
     {
         $this->memory->addMessage($this->sessionId, 'user', 'Ping');
+
         $this->assertTrue($this->memory->clear($this->sessionId));
+
         $this->assertEmpty($this->memory->getMessage($this->sessionId));
     }
 }
