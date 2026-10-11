@@ -55,8 +55,8 @@ class RedisConversationMemory implements ConversationMemoryInterface
         // Push message to the end of Redis List
         Redis::rpush($key, $payload);
 
-        if($this->windowSize>0){
-            Redis::ltrim($key,$this->windowSize,-1);
+        if ($this->windowSize > 0) {
+            Redis::ltrim($key, -$this->windowSize, -1);
         }
 
         // Refresh session expiration TTL
@@ -73,9 +73,9 @@ class RedisConversationMemory implements ConversationMemoryInterface
     {
         $key = $this->getKey($sessionId);
 
-        $rawMessage = Redis::lrange($key, 0, -1);
+        $rawMessages = Redis::lrange($key, 0, -1);
 
-        if (empty($rawMessage)) {
+        if (empty($rawMessages)) {
             return [];
         }
 
@@ -85,7 +85,7 @@ class RedisConversationMemory implements ConversationMemoryInterface
                 'role' => $decoded['role'],
                 'content' => $decoded['content'],
             ];
-        }, $rawMessage);
+        }, $rawMessages);
     }
 
     /**
