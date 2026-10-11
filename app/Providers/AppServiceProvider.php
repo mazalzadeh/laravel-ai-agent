@@ -14,6 +14,10 @@ use App\AI\Context\VectorContextRetriever;
 use App\AI\CoT\CoTOutputParser;
 use App\AI\CoT\CoTService;
 use App\AI\CoT\Prompts\CoTPromptTemplate;
+use App\Agent\Contracts\ConversationMemoryInterface;
+use App\Agent\Contracts\ResponseCacheInterface;
+use App\Agent\Services\RedisConversationMemory;
+use App\Agent\Services\RedisResponseCache;
 
 
 class AppServiceProvider extends ServiceProvider
@@ -42,6 +46,14 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->singleton(ConversationMemoryInterface::class, function ($app) {
+            return new RedisConversationMemory(ttl: 3600, windowSize: 10);
+        });
+
+        $this->app->singleton(ResponseCacheInterface::class, function ($app) {
+            return new RedisResponseCache(ttl: 86400);
+        });
+
         $this->app->bind(AIClientInterface::class, function () {
             $isMock = config('services.openai.mock', true);
 
@@ -49,7 +61,6 @@ class AppServiceProvider extends ServiceProvider
                 ? new FakeOpenAIClient()
                 : new OpenAIClient();
         });
-
     }
 
     /**
