@@ -339,6 +339,8 @@ class OpenAIClient implements AIClientInterface
             'stop',
             'user',
             'response_format',
+            'tools',
+            'tool_choice',
         ];
 
         return array_intersect_key($options, array_flip($allowedOptions));
