@@ -6,10 +6,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use App\Services\Llm\LlmClient;
 use App\Services\Llm\ConversationRunner;
-use App\AI\ToolRegistry;
+use App\Agent\Services\ToolRegistry;
 use App\AI\ToolExecutor;
 use App\AI\Tools\GetOrderStatusTool;
-use App\AI\Tools\ToolInterface;
+use App\Agent\Contracts\ToolInterface;
 use Tests\TestCase;
 
 class FunctionCallingTest extends TestCase

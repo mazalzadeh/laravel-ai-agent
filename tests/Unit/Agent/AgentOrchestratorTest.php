@@ -11,6 +11,7 @@ use App\Agent\Services\KnowledgeBaseHandler;
 use App\Agent\Services\TaskDecomposeHandler;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use App\Agent\Services\ToolExecutionHandler;
 
 class AgentOrchestratorTest extends TestCase
 {
@@ -20,12 +21,14 @@ class AgentOrchestratorTest extends TestCase
         $directAnswerHandler = $this->createMock(DirectAnswerHandler::class);
         $knowledgeBaseHandler = $this->createMock(KnowledgeBaseHandler::class);
         $taskDecomposeHandler = $this->createMock(TaskDecomposeHandler::class);
+        $toolExecutionHandler = $this->createMock(ToolExecutionHandler::class);
 
         $orchestrator = new AgentOrchestrator(
             $decisionService,
             $directAnswerHandler,
             $knowledgeBaseHandler,
-            $taskDecomposeHandler
+            $taskDecomposeHandler,
+            $toolExecutionHandler
         );
 
         $userInput = 'What is Laravel?';
@@ -62,12 +65,14 @@ class AgentOrchestratorTest extends TestCase
         $directAnswerHandler = $this->createMock(DirectAnswerHandler::class);
         $knowledgeBaseHandler = $this->createMock(KnowledgeBaseHandler::class);
         $taskDecomposeHandler = $this->createMock(TaskDecomposeHandler::class);
+        $toolExecutionHandler = $this->createMock(ToolExecutionHandler::class);
 
         $orchestrator = new AgentOrchestrator(
             $decisionService,
             $directAnswerHandler,
             $knowledgeBaseHandler,
-            $taskDecomposeHandler
+            $taskDecomposeHandler,
+            $toolExecutionHandler
         );
 
         $userInput = 'What is our return policy?';
@@ -104,12 +109,14 @@ class AgentOrchestratorTest extends TestCase
         $directAnswerHandler = $this->createMock(DirectAnswerHandler::class);
         $knowledgeBaseHandler = $this->createMock(KnowledgeBaseHandler::class);
         $taskDecomposeHandler = $this->createMock(TaskDecomposeHandler::class);
+        $toolExecutionHandler = $this->createMock(ToolExecutionHandler::class);
 
         $orchestrator = new AgentOrchestrator(
             $decisionService,
             $directAnswerHandler,
             $knowledgeBaseHandler,
-            $taskDecomposeHandler
+            $taskDecomposeHandler,
+            $toolExecutionHandler
         );
 
         $userInput = 'Plan a full migration strategy to Germany.';
@@ -146,12 +153,14 @@ class AgentOrchestratorTest extends TestCase
         $directAnswerHandler = $this->createMock(DirectAnswerHandler::class);
         $knowledgeBaseHandler = $this->createMock(KnowledgeBaseHandler::class);
         $taskDecomposeHandler = $this->createMock(TaskDecomposeHandler::class);
+        $toolExecutionHandler = $this->createMock(ToolExecutionHandler::class);
 
         $orchestrator = new AgentOrchestrator(
             $decisionService,
             $directAnswerHandler,
             $knowledgeBaseHandler,
-            $taskDecomposeHandler
+            $taskDecomposeHandler,
+            $toolExecutionHandler
         );
 
         $decision = new DecisionResult(
@@ -168,5 +177,45 @@ class AgentOrchestratorTest extends TestCase
         $this->expectExceptionMessage('Unknown action: INVALID_ACTION');
 
         $orchestrator->run('test input', null);
+    }
+
+
+    public function test_ot_delegates_to_tool_execution_handler_when_action_is_use_tool(): void
+    {
+        $userInput = 'Calculate 10 + 20';
+
+        // 1. Simulation of a decision-maker indicating that the tool should be used
+        $decisionService = $this->createMock(\App\Agent\Services\DecisionService::class);
+        $decision = new \App\Agent\DTO\DecisionResult(
+            action: \App\Agent\Enums\AgentAction::USE_TOOL->value,
+            parameters: [],
+            reasoning: 'Need to compute mathematical operation'
+        );
+        $decisionService->method('decide')->willReturn($decision);
+
+        // 2. Other dependent handlers
+        $directAnswerHandler = $this->createMock(\App\Agent\Services\DirectAnswerHandler::class);
+        $knowledgeBaseHandler = $this->createMock(\App\Agent\Services\KnowledgeBaseHandler::class);
+        $taskDecomposeHandler = $this->createMock(\App\Agent\Services\TaskDecomposeHandler::class);
+
+        // 3. Simulating the tools handler
+        $toolExecutionHandler = $this->createMock(\App\Agent\Services\ToolExecutionHandler::class);
+        $toolExecutionHandler->expects($this->once())
+            ->method('handle')
+            ->with($userInput, null)
+            ->willReturn('The answer is 30.');
+
+        // 4. Create the orchestrator with the new handler
+        $orchestrator = new \App\Agent\Services\AgentOrchestrator(
+            $decisionService,
+            $directAnswerHandler,
+            $knowledgeBaseHandler,
+            $taskDecomposeHandler,
+            $toolExecutionHandler
+        );
+
+        $response = $orchestrator->run($userInput);
+
+        $this->assertEquals('The answer is 30.', $response);
     }
 }
