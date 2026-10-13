@@ -17,12 +17,14 @@ class AgentOrchestrator
      * @param DirectAnswerHandler $directAnswerHandler Handler for immediate, direct replies.
      * @param KnowledgeBaseHandler $knowledgeBaseHandler Handler for RAG/retrieval workflows.
      * @param TaskDecomposeHandler $taskDecomposeHandler Handler for decomposing and executing complex subtasks.
+     * @param ToolExecutionHandler $toolExecutionHandler Handler for executing external tool loops.
      */
     public function __construct(
         private DecisionService $decisionService,
         private DirectAnswerHandler $directAnswerHandler,
         private KnowledgeBaseHandler $knowledgeBaseHandler,
         private TaskDecomposeHandler $taskDecomposeHandler,
+        private ToolExecutionHandler $toolExecutionHandler,
     ) {}
 
 
@@ -88,6 +90,7 @@ class AgentOrchestrator
             AgentAction::DIRECT_ANSWER->value => $this->directAnswerHandler->handle($userInput, $context, $decision),
             AgentAction::SEARCH_KNOWLEDGE_BASE->value => $this->knowledgeBaseHandler->handle($userInput, $context, $decision),
             AgentAction::DECOMPOSE_TASK->value => $this->taskDecomposeHandler->handle($userInput, $context, $decision),
+            AgentAction::USE_TOOL->value => $this->toolExecutionHandler->handle($userInput, $context),
             default => throw new InvalidArgumentException("Unknown action: {$actionValue}"),
         };
     }

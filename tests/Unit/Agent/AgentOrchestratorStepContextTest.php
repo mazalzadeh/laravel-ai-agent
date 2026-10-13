@@ -10,6 +10,7 @@ use App\Agent\Services\DecisionService;
 use App\Agent\Services\DirectAnswerHandler;
 use App\Agent\Services\KnowledgeBaseHandler;
 use App\Agent\Services\TaskDecomposeHandler;
+use App\Agent\Services\ToolExecutionHandler;
 use PHPUnit\Framework\TestCase;
 
 class AgentOrchestratorStepContextTest extends TestCase
@@ -20,8 +21,9 @@ class AgentOrchestratorStepContextTest extends TestCase
         $direct = $this->createMock(DirectAnswerHandler::class);
         $kb = $this->createMock(KnowledgeBaseHandler::class);
         $decompose = $this->createMock(TaskDecomposeHandler::class);
+        $toolExecutionHandler = $this->createMock(ToolExecutionHandler::class);
 
-        $orchestrator = new AgentOrchestrator($decisionService, $direct, $kb, $decompose);
+        $orchestrator = new AgentOrchestrator($decisionService, $direct, $kb, $decompose,$toolExecutionHandler);
 
         $decision = new DecisionResult(
             action: AgentAction::DIRECT_ANSWER->value,

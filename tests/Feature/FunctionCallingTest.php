@@ -328,7 +328,7 @@ class FunctionCallingTest extends TestCase
         //Arrange
         $registry = new ToolRegistry();
 
-        $failingTool = new class implements ToolInterface {
+                $failingTool = new class implements ToolInterface {
             public function name(): string
             {
                 return 'failing_tool';
@@ -440,62 +440,61 @@ class FunctionCallingTest extends TestCase
 
 
     public function test_it_stops_when_conversation_exceeds_maximum_iterations(): void
-{
-    $client = new class extends LlmClient {
-        public int $chatCalls = 0;
+    {
+        $client = new class extends LlmClient {
+            public int $chatCalls = 0;
 
-        public function chat(array $messages, array $tools = []): array
-        {
-            $this->chatCalls++;
+            public function chat(array $messages, array $tools = []): array
+            {
+                $this->chatCalls++;
 
-            return [
-                'choices' => [
-                    [
-                        'message' => [
-                            'role' => 'assistant',
-                            'content' => null,
-                            'tool_calls' => [
-                                [
-                                    'id' => 'call_loop_' . $this->chatCalls,
-                                    'type' => 'function',
-                                    'function' => [
-                                        'name' => 'get_order_status',
-                                        'arguments' => json_encode([
-                                            'order_id' => 'ORD-9988',
-                                        ]),
+                return [
+                    'choices' => [
+                        [
+                            'message' => [
+                                'role' => 'assistant',
+                                'content' => null,
+                                'tool_calls' => [
+                                    [
+                                        'id' => 'call_loop_' . $this->chatCalls,
+                                        'type' => 'function',
+                                        'function' => [
+                                            'name' => 'get_order_status',
+                                            'arguments' => json_encode([
+                                                'order_id' => 'ORD-9988',
+                                            ]),
+                                        ],
                                     ],
                                 ],
                             ],
                         ],
                     ],
-                ],
-            ];
-        }
-    };
+                ];
+            }
+        };
 
-    $registry = new ToolRegistry();
-    $registry->register(new GetOrderStatusTool());
+        $registry = new ToolRegistry();
+        $registry->register(new GetOrderStatusTool());
 
-    $executor = new ToolExecutor($registry);
+        $executor = new ToolExecutor($registry);
 
-    $runner = new ConversationRunner(
-        client: $client,
-        registry: $registry,
-        executor: $executor,
-        maxIterations: 3,
-    );
-
-    try {
-        $runner->run('وضعیت سفارش ORD-9988 را بگو');
-        $this->fail('Expected the conversation loop limit exception to be thrown.');
-    } catch (\RuntimeException $exception) {
-        $this->assertSame(
-            'Conversation loop exceeded maximum allowed iterations (3).',
-            $exception->getMessage()
+        $runner = new ConversationRunner(
+            client: $client,
+            registry: $registry,
+            executor: $executor,
+            maxIterations: 3,
         );
+
+        try {
+            $runner->run('وضعیت سفارش ORD-9988 را بگو');
+            $this->fail('Expected the conversation loop limit exception to be thrown.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame(
+                'Conversation loop exceeded maximum allowed iterations (3).',
+                $exception->getMessage()
+            );
+        }
+
+        $this->assertSame(3, $client->chatCalls);
     }
-
-    $this->assertSame(3, $client->chatCalls);
-}
-
 }
