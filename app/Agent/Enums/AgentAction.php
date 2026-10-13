@@ -25,6 +25,7 @@ enum AgentAction: string
             self::DIRECT_ANSWER => 'Use when the user request can be answered directly using general knowledge without external data.',
             self::SEARCH_KNOWLEDGE_BASE => 'Use when the user request requires domain-specific facts, documents, or database knowledge.',
             self::DECOMPOSE_TASK => 'Use when the user request is complex and requires breaking down into sequential sub-tasks.',
+            self::USE_TOOL => 'Use when the user request requires calling external tools or functions to compute or retrieve data.',
         };
     }
 

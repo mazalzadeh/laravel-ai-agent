@@ -3,7 +3,7 @@
 namespace App\Services\Llm;
 
 use App\AI\ToolExecutor;
-use App\Agent\Services\ToolRegistry;
+use App\AI\ToolRegistry;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use JsonException;
